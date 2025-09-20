@@ -1,0 +1,58 @@
+{
+  "name": "zeropay",
+  "version": "1.0.0",
+  "description": "Official landing page for ZeroPay - an open-source, self-hosted payment gateway for stablecoins and crypto subscriptions",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext js,jsx --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,css,md}\" \"*.{js,jsx,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css,md}\" \"*.{js,jsx,css,md}\""
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "postcss": "^8.4.38",
+    "prettier": "^3.2.5",
+    "tailwindcss": "^3.4.3",
+    "vite": "^5.2.0"
+  },
+  "keywords": [
+    "zeropay",
+    "crypto",
+    "payments",
+    "stablecoin",
+    "blockchain",
+    "web3",
+    "open-source",
+    "react",
+    "landing-page"
+  ],
+  "author": "ZeroPay Team",
+  "license": "MIT",
+  "homepage": "https://zeropay.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZeroPayDev/ZeroPay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ZeroPayDev/ZeroPay/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
