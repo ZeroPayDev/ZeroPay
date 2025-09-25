@@ -1,0 +1,6 @@
+/target
+Cargo.lock
+.env
+.idea
+.vscode
+scan_block
