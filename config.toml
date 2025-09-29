@@ -1,0 +1,9 @@
+# Secret mnemoincs code for generate accounts (12/24 words)
+mnemonics="String"
+
+[[chains]]
+type="evm"
+admin="xxxxxxxx"
+rpc="xxxx"
+commission = 5
+tokens=["", ""]
