@@ -3,4 +3,4 @@ Cargo.lock
 .env
 .idea
 .vscode
-scan_block
+config.toml
