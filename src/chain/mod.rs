@@ -53,6 +53,10 @@ pub async fn run(
     let mut chains = vec![];
     let mut chain_id = 0;
     for config in configs {
+        info!(
+            "[{}] {} scanner running",
+            config.chain_type, config.chain_name
+        );
         let wallet: PrivateKeySigner = config.admin.parse().unwrap();
         let rpc: Url = config.rpc.parse().unwrap();
         let provider = ProviderBuilder::new().connect_http(rpc.clone());
@@ -75,6 +79,8 @@ pub async fn run(
         evm::Scanner::new(
             db.clone(),
             chain_id,
+            config.chain_name,
+            config.latency,
             rpc.clone(),
             tokens,
             sender.clone(),

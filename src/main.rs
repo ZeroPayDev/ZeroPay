@@ -66,9 +66,12 @@ struct Config {
 
 #[derive(Debug, Deserialize)]
 struct ConfigChain {
-    admin: String,
-    rpc: String,
+    chain_type: String,
+    chain_name: String,
+    latency: u64,
     commission: i32,
+    rpc: String,
+    admin: String,
     tokens: Vec<String>,
 }
 

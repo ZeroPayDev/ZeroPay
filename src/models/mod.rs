@@ -1,14 +1,14 @@
+mod chain;
 mod customer;
 mod deposit;
 mod merchant;
 mod session;
-// mod chain;
 
+pub use chain::ChainBlock;
 pub use customer::Customer;
 pub use deposit::Deposit;
 pub use merchant::Merchant;
 pub use session::Session;
-// pub use chain::Chain;
 
 /// main session event for webhook
 pub enum Event {

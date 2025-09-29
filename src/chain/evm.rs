@@ -1,4 +1,5 @@
 use super::ChainMessage;
+use crate::models::ChainBlock;
 use alloy::{
     network::TransactionBuilder,
     primitives::{Address, B256, U256},
@@ -41,6 +42,8 @@ pub struct TransferEvent {
 pub struct Scanner {
     db: PgPool,
     chain_id: usize,
+    name: String,
+    latency: u64,
     rpc: Url,
     tokens: Vec<Address>,
     event: B256,
@@ -53,6 +56,8 @@ impl Scanner {
     pub async fn new(
         db: PgPool,
         chain_id: usize,
+        name: String,
+        latency: u64,
         rpc: Url,
         tokens: Vec<Address>,
         sender: UnboundedSender<ChainMessage>,
@@ -60,12 +65,14 @@ impl Scanner {
     ) -> Result<Self> {
         let event = EvmToken::Transfer::SIGNATURE_HASH;
 
-        // TODO fetch last scanned block from chain
-        let last_scanned_block = 0;
+        // fetch last scanned block from chain
+        let last_scanned_block = ChainBlock::get_block(&name, &db).await;
 
         let mut scan = Self {
             db,
             chain_id,
+            name,
+            latency,
             rpc,
             tokens,
             event,
@@ -172,16 +179,18 @@ impl Scanner {
 
     // Single scan iteration
     async fn scan_iteration(&mut self, max_blocks_per_scan: u64) -> Result<u64> {
-        let latest_block = self.get_latest_block().await?;
+        // IMPORTANT: for better finalized, we slower some-block, works for almost blockchain
+        let latest_block = self.get_latest_block().await? - self.latency;
 
         if latest_block <= self.last_scanned_block {
             return Ok(0);
         }
 
         let from_block = self.last_scanned_block + 1;
-        let to_block = std::cmp::min(from_block + max_blocks_per_scan - 1, latest_block);
+        let to_block = std::cmp::min(from_block + max_blocks_per_scan, latest_block);
 
         self.scan_range(from_block, to_block).await?;
+        let _ = ChainBlock::insert(&self.name, to_block, &self.db).await;
 
         let scanned_blocks = to_block - from_block + 1;
         self.last_scanned_block = to_block;
