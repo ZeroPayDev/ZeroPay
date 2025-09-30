@@ -4,10 +4,7 @@ extern crate tracing;
 #[macro_use]
 extern crate sqlx;
 
-mod auth;
-mod chain;
-mod controllers;
-mod did;
+mod api;
 mod error;
 mod models;
 
@@ -17,9 +14,9 @@ use axum::{
     routing::{get, post},
 };
 use clap::Parser;
-use controllers::*;
+use models::Storage;
 use redis::Client as RedisClient;
-use serde::Deserialize;
+use scanner::{ChainConfig, ScannerMessage, ScannerService};
 use sqlx::{
     any::Any as SqlxAny,
     migrate::MigrateDatabase,
@@ -45,34 +42,25 @@ struct Command {
     #[arg(long, env = "REDIS_URL", default_value = "redis://127.0.0.1:6379")]
     redis: String,
 
-    /// Secret for JWT
-    #[arg(short, long, env = "SECRET", default_value = "")]
-    secret: String,
+    /// Account system mnemonics
+    #[arg(long, env = "MNEMONICS")]
+    mnemonics: String,
 
-    /// Website domain for session url
-    #[arg(short, long, env = "DOMAIN", default_value = "http://127.0.0.1:9000")]
-    domain: String,
+    /// Main wallet which used to receive money
+    #[arg(long, env = "WALLET")]
+    wallet: String,
+
+    /// Apikey for auth
+    #[arg(long, env = "APIKEY")]
+    apikey: String,
+
+    /// Webhook when new event emit
+    #[arg(long, env = "WEBHOOK")]
+    webhook: Option<String>,
 
     /// Chain configure file path
     #[arg(long, env = "CHAIN_CONFIG", default_value = "config.toml")]
     chain_config: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Config {
-    mnemonics: String,
-    chains: Vec<ConfigChain>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ConfigChain {
-    chain_type: String,
-    chain_name: String,
-    latency: u64,
-    commission: i32,
-    rpc: String,
-    admin: String,
-    tokens: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -80,9 +68,8 @@ struct AppState {
     db: PgPool,
     redis: RedisClient,
     mnemonics: String,
-    secret: [u8; 32],
-    domain: String,
-    sender: UnboundedSender<chain::ChainMessage>,
+    apikey: String,
+    _sender: UnboundedSender<ScannerMessage>,
 }
 
 #[tokio::main]
@@ -95,11 +82,7 @@ async fn main() {
 
     let args = Command::parse();
     let chain_str = std::fs::read_to_string(&args.chain_config).unwrap();
-    let chain_config: Config = toml::from_str(&chain_str).unwrap();
-    let Config { mnemonics, chains } = chain_config;
-
-    // domain check and filer
-    let domain = args.domain.trim_end_matches("/").to_owned();
+    let chain_configs: Vec<ChainConfig> = toml::from_str(&chain_str).unwrap();
 
     // setup database & init
     let _ = SqlxAny::create_database(&args.database).await;
@@ -132,25 +115,26 @@ async fn main() {
         }
     };
 
-    // Load existing customer addresses into Redis
-    if let Err(e) = models::Customer::load_all_addresses_to_redis(&db, &redis).await {
-        tracing::error!("Failed to load customer addresses to Redis: {:?}", e);
-        // Don't exit - this is not critical for service startup
-    }
-
     // running listening chain & tokens
-    let sender = chain::run(mnemonics.clone(), db.clone(), chains, redis.clone()).await;
-
-    let secret_key = blake3::hash(args.secret.as_bytes());
-    let secret: [u8; 32] = secret_key.into();
+    let storage = Storage {
+        db: db.clone(),
+        redis: redis.clone(),
+        webhook: args.webhook,
+        wallet: args.wallet,
+    };
+    let _sender = ScannerService::new(storage, args.mnemonics.clone(), chain_configs)
+        .await
+        .unwrap()
+        .run()
+        .await
+        .unwrap();
 
     let app_state = Arc::new(AppState {
-        sender,
+        _sender,
         db,
         redis,
-        secret,
-        mnemonics,
-        domain,
+        apikey: args.apikey,
+        mnemonics: args.mnemonics,
     });
 
     let cors = CorsLayer::new()
@@ -159,12 +143,8 @@ async fn main() {
         .allow_headers(Any);
 
     let router = Router::new()
-        .route("/api/nonce", get(nonce))
-        .route("/api/login", post(login))
-        .route("/api/sessions", post(create_session))
-        .route("/api/sessions/{id}", get(get_session))
-        .route("/api/merchants/info", post(update_info))
-        .route("/api/merchants/apikey", post(update_apikey))
+        .route("/api/sessions", post(api::create_session))
+        .route("/api/sessions/{id}", get(api::get_session))
         .with_state(app_state)
         .layer(cors);
 

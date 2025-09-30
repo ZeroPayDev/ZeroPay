@@ -1,0 +1,14 @@
+[package]
+name = "scanner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy.workspace = true
+anyhow.workspace = true
+hex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+tdn_did.workspace = true
+tokio.workspace = true
+tracing.workspace = true

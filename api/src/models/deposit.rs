@@ -16,14 +16,10 @@ pub struct Deposit {
 }
 
 impl Deposit {
-    pub async fn _list(customer_id: i32, _page: i32, db: &PgPool) -> Result<Vec<Self>> {
-        let res = query_as!(
-            Self,
-            "SELECT * FROM deposits WHERE customer=$1",
-            customer_id
-        )
-        .fetch_all(db)
-        .await?;
+    pub async fn get(id: i32, db: &PgPool) -> Result<Self> {
+        let res = query_as!(Self, "SELECT * FROM deposits WHERE id=$1", id)
+            .fetch_one(db)
+            .await?;
 
         Ok(res)
     }

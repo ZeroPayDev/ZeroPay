@@ -23,6 +23,14 @@ impl Session {
         Ok(res)
     }
 
+    pub async fn get_by_deposit(did: i32, db: &PgPool) -> Result<Self> {
+        let res = query_as!(Self, "SELECT * FROM sessions WHERE deposit=$1", did)
+            .fetch_one(db)
+            .await?;
+
+        Ok(res)
+    }
+
     pub async fn list_unused(customer: i32, db: &PgPool) -> Result<Vec<Session>> {
         let res = query_as!(
             Self,
@@ -56,7 +64,7 @@ impl Session {
     pub async fn used(&self, deposit: i32, db: &PgPool) -> Result<()> {
         let now = Utc::now().naive_utc();
         let _ = query!(
-            "UPDATE sessions SET deposit = $1, updated_at=$2 WHERE id=$3",
+            "UPDATE sessions SET deposit=$1, updated_at=$2 WHERE id=$3",
             deposit,
             now,
             self.id

@@ -11,24 +11,24 @@ pub struct ChainBlock {
 }
 
 impl ChainBlock {
-    pub async fn get_block(name: &str, db: &PgPool) -> u64 {
+    pub async fn get_block(name: &str, db: &PgPool) -> i64 {
         if let Ok(res) = query_as!(Self, "SELECT * FROM chains WHERE name=$1", name)
             .fetch_one(db)
             .await
         {
-            res.block as u64
+            res.block
         } else {
             0
         }
     }
 
-    pub async fn insert(name: &str, block: u64, db: &PgPool) -> Result<()> {
+    pub async fn insert(name: &str, block: i64, db: &PgPool) -> Result<()> {
         let now = Utc::now().naive_utc();
         if Self::get_block(name, db).await == 0 {
             query!(
                 "INSERT INTO chains(name,block,updated_at) VALUES ($1,$2,$3)",
                 name,
-                block as i64,
+                block,
                 now,
             )
             .execute(db)
@@ -36,7 +36,7 @@ impl ChainBlock {
         } else {
             query!(
                 "UPDATE chains SET block=$1,updated_at=$2 WHERE name = $3",
-                block as i64,
+                block,
                 now,
                 name
             )

@@ -3,4 +3,3 @@ Cargo.lock
 .env
 .idea
 .vscode
-config.toml

@@ -1,5 +1,4 @@
-use super::ChainMessage;
-use crate::models::ChainBlock;
+use crate::{Chain, ChainDeposit, ScannerMessage};
 use alloy::{
     network::TransactionBuilder,
     primitives::{Address, B256, U256},
@@ -12,8 +11,6 @@ use alloy::{
     transports::http::reqwest::Url,
 };
 use anyhow::Result;
-use redis::{AsyncCommands, Client as RedisClient};
-use sqlx::PgPool;
 use tokio::{
     sync::mpsc::UnboundedSender,
     time::{Duration, sleep},
@@ -26,59 +23,34 @@ sol!(
     "ERC20.json"
 );
 
-#[derive(Debug)]
-pub struct TransferEvent {
-    pub token: Address,
-    pub from: Address,
-    pub to: Address,
-    pub amount: U256,
-    pub transaction_hash: B256,
-    // pub block_number: u64,
-    // pub log_index: u64,
-}
-
 // Scanner state to track progress
 #[derive(Debug)]
 pub struct Scanner {
-    db: PgPool,
-    chain_id: usize,
-    name: String,
+    index: usize,
     latency: u64,
     rpc: Url,
     tokens: Vec<Address>,
     event: B256,
     last_scanned_block: u64,
-    sender: UnboundedSender<ChainMessage>,
-    redis: RedisClient,
+    sender: UnboundedSender<ScannerMessage>,
 }
 
 impl Scanner {
     pub async fn new(
-        db: PgPool,
-        chain_id: usize,
-        name: String,
-        latency: u64,
-        rpc: Url,
-        tokens: Vec<Address>,
-        sender: UnboundedSender<ChainMessage>,
-        redis: RedisClient,
+        index: usize,
+        chain: &Chain,
+        sender: UnboundedSender<ScannerMessage>,
     ) -> Result<Self> {
         let event = EvmToken::Transfer::SIGNATURE_HASH;
 
-        // fetch last scanned block from chain
-        let last_scanned_block = ChainBlock::get_block(&name, &db).await;
-
         let mut scan = Self {
-            db,
-            chain_id,
-            name,
-            latency,
-            rpc,
-            tokens,
+            index,
+            latency: chain.latency as u64,
+            rpc: chain.rpc.clone(),
+            tokens: chain.tokens.clone(),
             event,
-            last_scanned_block,
+            last_scanned_block: chain.last_scanned_block as u64,
             sender,
-            redis,
         };
 
         if scan.last_scanned_block == 0 {
@@ -107,10 +79,9 @@ impl Scanner {
             .to_block(to_block);
 
         let logs = provider.get_logs(&filter).await?;
-
         for log in logs {
-            if let Ok(event) = self.parse_transfer_event(log).await {
-                self.handle_transfer_event(event);
+            if let Err(err) = self.handle_transfer_event(log) {
+                tracing::error!("Parse event error: {:?}", err);
             }
         }
 
@@ -118,63 +89,24 @@ impl Scanner {
     }
 
     // Parse a log into a TransferEvent
-    async fn parse_transfer_event(&self, log: Log) -> Result<TransferEvent> {
+    fn handle_transfer_event(&self, log: Log) -> Result<()> {
         // ERC20 Transfer event signature: Transfer(address,address,uint256)
         let event = EvmToken::Transfer::decode_log(&log.inner)?;
 
-        // Check if the 'to' address is a valid customer address
-        if !self.is_customer_address(&event.to).await {
-            return Err(anyhow::anyhow!("No need"));
-        }
-
-        Ok(TransferEvent {
-            token: log.address(),
-            from: event.from,
-            to: event.to,
-            amount: event.value,
-            transaction_hash: log.transaction_hash.unwrap_or(B256::ZERO),
-            // block_number: log.block_number.unwrap_or(0),
-            // log_index: log.log_index.unwrap_or(0),
-        })
-    }
-
-    // Check if an address is a valid customer address in Redis
-    async fn is_customer_address(&self, address: &Address) -> bool {
-        match self.redis.get_multiplexed_async_connection().await {
-            Ok(mut conn) => {
-                let key = format!("customer_addr:{}", address);
-                match conn.exists(&key).await {
-                    Ok(exists) => exists,
-                    Err(e) => {
-                        error!("Redis error checking address {}: {}", address, e);
-                        false
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Failed to get Redis connection: {}", e);
-                false
-            }
-        }
-    }
-
-    // Process transfer events and send to the message queue
-    fn handle_transfer_event(&self, event: TransferEvent) {
-        info!(
-            "Chain {}: customer transfer - Token: {}, From: {}, To: {}, Amount: {}",
-            self.chain_id, event.token, event.from, event.to, event.amount
-        );
-
         // Send deposit message for processing
-        if let Err(e) = self.sender.send(ChainMessage::Deposit(
-            self.chain_id,
-            event.token,
-            event.to,
-            event.amount,
-            event.transaction_hash,
-        )) {
-            error!("Failed to send deposit message: {}", e);
-        }
+        let _ = self.sender.send(ScannerMessage::Deposit(
+            self.index,
+            ChainDeposit::Evm(
+                log.address(), // token address
+                event.to,
+                event.value,
+                log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+            ),
+        ));
+
+        // block_number: log.block_number.unwrap_or(0),
+        // log_index: log.log_index.unwrap_or(0),
+        Ok(())
     }
 
     // Single scan iteration
@@ -190,7 +122,9 @@ impl Scanner {
         let to_block = std::cmp::min(from_block + max_blocks_per_scan, latest_block);
 
         self.scan_range(from_block, to_block).await?;
-        let _ = ChainBlock::insert(&self.name, to_block, &self.db).await;
+        let _ = self
+            .sender
+            .send(ScannerMessage::Scanned(self.index, to_block as i64));
 
         let scanned_blocks = to_block - from_block + 1;
         self.last_scanned_block = to_block;
@@ -207,9 +141,11 @@ impl Scanner {
                 let scan_interval = match self.scan_iteration(max_blocks_per_scan).await {
                     Ok(scanned_blocks) => {
                         if scanned_blocks > 0 {
-                            debug!(
+                            tracing::debug!(
                                 "Chain {}: Scanned {} blocks, current block: {}",
-                                self.chain_id, scanned_blocks, self.last_scanned_block
+                                self.index,
+                                scanned_blocks,
+                                self.last_scanned_block
                             );
 
                             // If we're catching up, scan faster
@@ -225,7 +161,7 @@ impl Scanner {
                         }
                     }
                     Err(e) => {
-                        error!("Chain {}: Scan error: {}", self.chain_id, e);
+                        tracing::error!("Chain {}: Scan error: {}", self.index, e);
                         // On error, wait longer before retrying
                         Duration::from_secs(30)
                     }
