@@ -8,7 +8,7 @@ An open-source, self-hosted payment gateway for stablecoins and crypto subscript
 ## Platform
 Enjoy a simpler and more stable platform version. Please note that the platform will deduct part of the commission rate as a handling gas fee.
 1. open [zeropay.dev](https://zeropay.dev) to register merchant info.
-2. use `api.zeropay.dev` as the service
+2. use `https://api.zeropay.dev` as the service
 
 ## Payment API
 #### POST `/sessions?apikey=xxxx` create new session for customer to pay
@@ -45,7 +45,12 @@ same as above create new session response
 ```
 
 ## Payment Webhook
+all webhook event request will use `HMAC`, the hmac use the `sha256` hash(sha2_256).
+1. use `apikey` as the secret key
+2. the header `X-HMAC` is the code
+3. the request body is the message
 
+### Events
 #### `session.paid` when customer paid the money
 ```
 {
