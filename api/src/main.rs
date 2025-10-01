@@ -143,8 +143,8 @@ async fn main() {
         .allow_headers(Any);
 
     let router = Router::new()
-        .route("/api/sessions", post(api::create_session))
-        .route("/api/sessions/{id}", get(api::get_session))
+        .route("/sessions", post(api::create_session))
+        .route("/sessions/{id}", get(api::get_session))
         .with_state(app_state)
         .layer(cors);
 
