@@ -6,7 +6,7 @@ An open-source, self-hosted payment gateway for stablecoins and crypto subscript
 2. Build from source
 
 ## Platform
-If you find deployment difficult, you can use the services provided by our platform (we also use it ourselves).
+Enjoy a simpler and more stable platform version. Please note that the platform will deduct part of the commission rate as a handling gas fee.
 1. open [zeropay.dev](https://zeropay.dev) to register merchant info.
 2. use `api.zeropay.dev` as the service
 
@@ -77,3 +77,7 @@ same as above create new session response
   params: ["neo", 9500], # customer name, settled amount
 }
 ```
+
+## License
+
+This project is licensed under [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html).
