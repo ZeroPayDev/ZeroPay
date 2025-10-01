@@ -1,7 +1,9 @@
 mod did;
+mod event;
 mod evm;
 
 pub use did::generate_eth;
+pub use event::ScannerEvent;
 
 use alloy::{
     primitives::{Address, B256, U256},

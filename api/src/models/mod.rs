@@ -10,55 +10,8 @@ pub use session::Session;
 
 use anyhow::Result;
 use redis::{AsyncCommands, Client as RedisClient};
+use scanner::ScannerEvent;
 use sqlx::PgPool;
-
-/// main session event for webhook
-pub enum Event {
-    SessionPaid(i32, String, i32),
-    SessionSettled(i32, String, i32),
-    UnknowPaid(String, i32),
-    UnknowSettled(String, i32),
-}
-
-impl Event {
-    pub async fn send(self, url: &str) -> Result<()> {
-        let client = reqwest::Client::new();
-
-        let (event, params): (&str, Vec<serde_json::Value>) = match self {
-            Event::SessionPaid(sid, customer, amount) => (
-                "session.paid",
-                vec![sid.into(), customer.into(), amount.into()],
-            ),
-            Event::SessionSettled(sid, customer, amount) => (
-                "session.settled",
-                vec![sid.into(), customer.into(), amount.into()],
-            ),
-            Event::UnknowPaid(customer, amount) => {
-                ("unknow.paid", vec![customer.into(), amount.into()])
-            }
-            Event::UnknowSettled(customer, amount) => {
-                ("unknow.settled", vec![customer.into(), amount.into()])
-            }
-        };
-
-        let payload = serde_json::json!({
-            "event": event,
-            "params": params
-        });
-        let response = client
-            .post(url)
-            .header("Content-Type", "application/json")
-            .json(&payload)
-            .send()
-            .await?;
-
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("failed status code"))
-        }
-    }
-}
 
 pub struct Storage {
     pub db: PgPool,
@@ -123,7 +76,7 @@ impl scanner::ScannerStorage for Storage {
             && let Ok(customer) = Customer::get(cid, &self.db).await
         {
             if let Some(session) = &used_session {
-                if Event::SessionPaid(session.id, customer.account, amount)
+                if ScannerEvent::SessionPaid(session.id, customer.account, amount)
                     .send(webhook)
                     .await
                     .is_ok()
@@ -131,7 +84,7 @@ impl scanner::ScannerStorage for Storage {
                     let _ = session.sent(&self.db).await;
                 }
             } else {
-                let _ = Event::UnknowPaid(customer.account, amount)
+                let _ = ScannerEvent::UnknowPaid(customer.account, amount)
                     .send(webhook)
                     .await;
             }
@@ -157,11 +110,11 @@ impl scanner::ScannerStorage for Storage {
         // 2. webhook settled event
         if let Some(webhook) = &self.webhook {
             if let Ok(session) = &used_session {
-                let _ = Event::SessionSettled(session.id, customer.account, amount)
+                let _ = ScannerEvent::SessionSettled(session.id, customer.account, amount)
                     .send(webhook)
                     .await;
             } else {
-                let _ = Event::UnknowSettled(customer.account, amount)
+                let _ = ScannerEvent::UnknowSettled(customer.account, amount)
                     .send(webhook)
                     .await;
             }
