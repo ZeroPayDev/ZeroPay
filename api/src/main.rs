@@ -16,7 +16,7 @@ use axum::{
 use clap::Parser;
 use models::Storage;
 use redis::Client as RedisClient;
-use scanner::{ChainConfig, ScannerMessage, ScannerService};
+use scanner::{ScannerConfig, ScannerMessage, ScannerService};
 use sqlx::{
     any::Any as SqlxAny,
     migrate::MigrateDatabase,
@@ -58,9 +58,9 @@ struct Command {
     #[arg(long, env = "WEBHOOK")]
     webhook: Option<String>,
 
-    /// Chain configure file path
-    #[arg(long, env = "CHAIN_CONFIG", default_value = "config.toml")]
-    chain_config: String,
+    /// Scanner chains configure file path
+    #[arg(long, env = "SCANNER_CONFIG", default_value = "config.toml")]
+    scanner_config: String,
 }
 
 #[derive(Clone)]
@@ -81,8 +81,8 @@ async fn main() {
     sqlx::any::install_default_drivers();
 
     let args = Command::parse();
-    let chain_str = std::fs::read_to_string(&args.chain_config).unwrap();
-    let chain_configs: Vec<ChainConfig> = toml::from_str(&chain_str).unwrap();
+    let scanner_str = std::fs::read_to_string(&args.scanner_config).unwrap();
+    let scanner_config: ScannerConfig = toml::from_str(&scanner_str).unwrap();
 
     // setup database & init
     let _ = SqlxAny::create_database(&args.database).await;
@@ -122,7 +122,7 @@ async fn main() {
         webhook: args.webhook,
         wallet: args.wallet,
     };
-    let _sender = ScannerService::new(storage, args.mnemonics.clone(), chain_configs)
+    let _sender = ScannerService::new(storage, args.mnemonics.clone(), scanner_config)
         .await
         .unwrap()
         .run()

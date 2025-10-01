@@ -16,6 +16,12 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 /// Chain configure
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ScannerConfig {
+    chains: Vec<ChainConfig>,
+}
+
+/// Chain configure
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
     chain_type: String,
     chain_name: String,
@@ -95,10 +101,10 @@ pub struct ScannerService<S: ScannerStorage> {
 }
 
 impl<S: ScannerStorage> ScannerService<S> {
-    pub async fn new(storage: S, mnemonics: String, configs: Vec<ChainConfig>) -> Result<Self> {
+    pub async fn new(storage: S, mnemonics: String, config: ScannerConfig) -> Result<Self> {
         // parse the chain configure
         let mut chains = vec![];
-        for config in configs {
+        for config in config.chains {
             let chain_type = ChainType::from_str(&config.chain_type);
             let wallet: PrivateKeySigner = config.admin.parse()?;
             let rpc: Url = config.rpc.parse()?;
