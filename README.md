@@ -10,8 +10,8 @@ Enjoy a simpler and more stable platform version. Please note that the platform 
 1. open [zeropay.dev](https://zeropay.dev) to register merchant info.
 2. use `api.zeropay.dev` as the service
 
-## Payment Session
-#### POST `/sessions` create new session for customer to pay
+## Payment API
+#### POST `/sessions?apikey=xxxx` create new session for customer to pay
 ```
 request:
 {
@@ -38,13 +38,13 @@ response:
 TIPS: * is platform-specific and is not required for standalone deployment.
 ```
 
-#### GET `/sessions/{id}` get the session status
+#### GET `/sessions/{id}?apikey=xxxx` get the session status
 ```
 response:
 same as above create new session response
 ```
 
-## Webhook
+## Payment Webhook
 
 #### `session.paid` when customer paid the money
 ```
