@@ -173,12 +173,11 @@ pub async fn store_address_in_redis(redis: &RedisClient, eth: &str, id: i32) -> 
     let mut conn = redis.get_multiplexed_async_connection().await?;
 
     let key = format!("zpc:{}", eth);
-    let _: () = conn.set(&key, id).await?;
 
     // Set expiration to 30 days
-    let _: bool = conn.expire(&key, 30 * 24 * 3600).await?;
+    let _: () = conn.set_ex(&key, id, 30 * 24 * 3600).await?;
 
-    info!("Stored customer address in Redis: {}", eth);
+    debug!("Stored customer address in Redis: {}", eth);
     Ok(())
 }
 
@@ -187,11 +186,10 @@ async fn store_transaction_in_redis(redis: &RedisClient, tx: &str) -> Result<()>
     let mut conn = redis.get_multiplexed_async_connection().await?;
 
     let key = format!("zpt:{}", tx);
-    let _: () = conn.set(&key, "1").await?;
 
     // Set expiration to 1 days enough
-    let _: bool = conn.expire(&key, 24 * 3600).await?;
+    let _: () = conn.set_ex(&key, 1, 24 * 3600).await?;
 
-    info!("Stored customer address in Redis: {}", tx);
+    debug!("Stored transaction in Redis: {}", tx);
     Ok(())
 }

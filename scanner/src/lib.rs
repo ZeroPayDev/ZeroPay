@@ -21,6 +21,8 @@ pub struct ChainConfig {
     chain_name: String,
     latency: i32,
     commission: i32,
+    commission_min: i32,
+    commission_max: i32,
     rpc: String,
     admin: String,
     tokens: Vec<String>,
@@ -64,6 +66,8 @@ struct Chain {
     chain_name: String,
     latency: i64,
     commission: i32,
+    commission_min: i32,
+    commission_max: i32,
     rpc: Url,
     wallet: PrivateKeySigner,
     tokens: Vec<Address>,
@@ -117,6 +121,8 @@ impl<S: ScannerStorage> ScannerService<S> {
                 chain_name: config.chain_name,
                 latency: config.latency as i64,
                 commission: config.commission,
+                commission_min: config.commission_min,
+                commission_max: config.commission_max,
                 rpc,
                 wallet,
                 tokens,
@@ -201,6 +207,8 @@ impl<S: ScannerStorage> ScannerService<S> {
             chain.wallet.clone(),
             chain.rpc.clone(),
             chain.commission,
+            evm::i32_to_u256(chain.commission_min, decimal),
+            evm::i32_to_u256(chain.commission_max, decimal),
         )
         .await?;
 

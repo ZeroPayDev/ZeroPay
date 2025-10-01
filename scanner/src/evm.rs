@@ -182,6 +182,8 @@ pub async fn transfer(
     main: PrivateKeySigner,
     url: Url,
     commission_rate: i32,
+    commission_min: U256,
+    commission_max: U256,
 ) -> Result<(U256, B256)> {
     let maccount = main.address();
     let provider = ProviderBuilder::new()
@@ -213,10 +215,14 @@ pub async fn transfer(
     } else {
         0
     };
-    let commission = balance * U256::from(commission_rate) / U256::from(100);
-    let fee = commission;
-    // + U256::from(transfer_gas * 2 + approve_gas); // TODO fetch current price
 
+    let fee = if commission_rate > 0 {
+        let rate = balance * U256::from(commission_rate) / U256::from(100);
+        let rate_max = core::cmp::min(rate, commission_max);
+        core::cmp::max(rate_max, commission_min)
+    } else {
+        U256::from(0)
+    };
     let real = balance - fee;
 
     if need_approve {
@@ -269,4 +275,12 @@ pub fn u256_to_i32(amount: U256, decimal: &u8) -> i32 {
     };
 
     res.try_into().unwrap_or(0)
+}
+
+pub fn i32_to_u256(amount: i32, decimal: &u8) -> U256 {
+    if *decimal > 2 {
+        U256::from(amount) * U256::from(*decimal - 2)
+    } else {
+        U256::from(amount) * U256::from(*decimal)
+    }
 }
