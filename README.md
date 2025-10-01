@@ -16,7 +16,7 @@ Enjoy a simpler and more stable platform version. Please note that the platform 
 request:
 {
   customer: string, # the identity customer name
-  amount: int, # the amount must with 100 decimal, e.g. $10, use 1000
+  amount: int,      # the amount must with 100 decimal, e.g. $10, use 1000
 }
 
 response:
