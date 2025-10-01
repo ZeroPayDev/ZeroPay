@@ -119,6 +119,7 @@ async fn main() {
     let storage = Storage {
         db: db.clone(),
         redis: redis.clone(),
+        apikey: args.apikey.clone(),
         webhook: args.webhook,
         wallet: args.wallet,
     };

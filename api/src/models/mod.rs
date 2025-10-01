@@ -16,6 +16,7 @@ use sqlx::PgPool;
 pub struct Storage {
     pub db: PgPool,
     pub redis: RedisClient,
+    pub apikey: String,
     pub webhook: Option<String>,
     pub wallet: String,
 }
@@ -77,7 +78,7 @@ impl scanner::ScannerStorage for Storage {
         {
             if let Some(session) = &used_session {
                 if ScannerEvent::SessionPaid(session.id, customer.account, amount)
-                    .send(webhook)
+                    .send(webhook, &self.apikey)
                     .await
                     .is_ok()
                 {
@@ -85,7 +86,7 @@ impl scanner::ScannerStorage for Storage {
                 }
             } else {
                 let _ = ScannerEvent::UnknowPaid(customer.account, amount)
-                    .send(webhook)
+                    .send(webhook, &self.apikey)
                     .await;
             }
         }
@@ -111,11 +112,11 @@ impl scanner::ScannerStorage for Storage {
         if let Some(webhook) = &self.webhook {
             if let Ok(session) = &used_session {
                 let _ = ScannerEvent::SessionSettled(session.id, customer.account, amount)
-                    .send(webhook)
+                    .send(webhook, &self.apikey)
                     .await;
             } else {
                 let _ = ScannerEvent::UnknowSettled(customer.account, amount)
-                    .send(webhook)
+                    .send(webhook, &self.apikey)
                     .await;
             }
         }
