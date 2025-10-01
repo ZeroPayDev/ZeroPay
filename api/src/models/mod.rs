@@ -81,18 +81,21 @@ impl scanner::ScannerStorage for Storage {
     async fn contains_address(&self, address: &str) -> Result<(i32, i32, String)> {
         let key = format!("zpc:{}", address);
         let mut conn = self.redis.get_multiplexed_async_connection().await?;
-        let id = conn.get(&key).await?;
+        if !conn.exists(&key).await? {
+            return Err(anyhow::anyhow!("No address: {address}"));
+        }
 
+        let id: i32 = conn.get(&key).await?;
         Ok((0, id, self.wallet.clone()))
     }
 
-    async fn contains_transaction(&self, tx: &str) -> Result<()> {
+    async fn no_transaction(&self, tx: &str) -> Result<()> {
         let key = format!("zpt:{}", tx);
         let mut conn = self.redis.get_multiplexed_async_connection().await?;
         if conn.exists(&key).await? {
-            Ok(())
+            Err(anyhow::anyhow!("Had transaction"))
         } else {
-            Err(anyhow::anyhow!("No transaction"))
+            Ok(())
         }
     }
 

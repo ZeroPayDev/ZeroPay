@@ -24,6 +24,7 @@ pub struct SessionResponse {
     pay_eth: String,
     amount: i32,
     expired: NaiveDateTime,
+    completed: bool,
 }
 
 impl SessionResponse {
@@ -34,6 +35,7 @@ impl SessionResponse {
             pay_eth: customer.eth,
             amount: session.amount,
             expired: session.expired_at,
+            completed: session.deposit.is_some(),
         }
     }
 }

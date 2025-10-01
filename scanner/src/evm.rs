@@ -92,6 +92,7 @@ impl Scanner {
     fn handle_transfer_event(&self, log: Log) -> Result<()> {
         // ERC20 Transfer event signature: Transfer(address,address,uint256)
         let event = EvmToken::Transfer::decode_log(&log.inner)?;
+        tracing::debug!("Fetch event: {}-{}:{}", event.from, event.to, event.value);
 
         // Send deposit message for processing
         let _ = self.sender.send(ScannerMessage::Deposit(
@@ -141,7 +142,7 @@ impl Scanner {
                 let scan_interval = match self.scan_iteration(max_blocks_per_scan).await {
                     Ok(scanned_blocks) => {
                         if scanned_blocks > 0 {
-                            tracing::debug!(
+                            tracing::info!(
                                 "Chain {}: Scanned {} blocks, current block: {}",
                                 self.index,
                                 scanned_blocks,
@@ -185,16 +186,18 @@ pub async fn transfer(
     commission_min: U256,
     commission_max: U256,
 ) -> Result<(U256, B256)> {
+    let zero = U256::from(0);
     let maccount = main.address();
     let provider = ProviderBuilder::new()
         .wallet(main)
         .connect_http(url.clone());
+    let gas_price = provider.get_gas_price().await? * 105 / 100; // add 5%
     let contract = EvmToken::new(token, provider.clone());
 
     // 1. check token balance
     let balance: U256 = contract.balanceOf(customer).call().await?;
 
-    if balance == U256::default() {
+    if balance == zero {
         return Err(anyhow::anyhow!("No balance"));
     }
 
@@ -203,60 +206,77 @@ pub async fn transfer(
     let need_approve = approved < balance;
 
     // 2. collect gas used, and do a discount in the amount
-    let _transfer_gas = contract
-        .transferFrom(customer, maccount, balance)
-        .estimate_gas()
-        .await?;
     let approve_gas = if need_approve {
-        contract
+        let gas = contract
             .approve(maccount, U256::from(100000000_000000i64))
+            .gas_price(gas_price)
             .estimate_gas()
-            .await?
+            .await?;
+        // add more 5%
+        U256::from(gas * 105 / 100) * U256::from(gas_price)
     } else {
-        0
+        zero
     };
+    tracing::debug!("{customer}: approve_gas: {approve_gas}");
 
     let fee = if commission_rate > 0 {
         let rate = balance * U256::from(commission_rate) / U256::from(100);
         let rate_max = core::cmp::min(rate, commission_max);
         core::cmp::max(rate_max, commission_min)
     } else {
-        U256::from(0)
+        zero
     };
     let real = balance - fee;
+    tracing::info!("{customer}: commission: {fee}, real: {real}");
 
     if need_approve {
         // 4. if not approve, transfer approve gas to it
         let ttx = TransactionRequest::default()
             .with_to(customer)
-            .with_value(U256::from(approve_gas));
+            .with_value(approve_gas);
         let pending = provider.send_transaction(ttx).await?;
+        tracing::debug!("{customer}: approve gas sent");
         let _receipt = pending.get_receipt().await?;
+        tracing::debug!("{customer}: approve gas arrived");
 
         // 5. approve tokens to max
         let customer_provider = ProviderBuilder::new().wallet(wallet).connect_http(url);
         let customer_contract = EvmToken::new(token, customer_provider);
+        let total = customer_contract
+            .totalSupply()
+            .call()
+            .await
+            .unwrap_or(U256::from(100000000_000000i64));
 
         let pending = customer_contract
-            .approve(maccount, U256::from(100000000_000000i64))
+            .approve(maccount, total)
+            .gas_price(gas_price)
             .send()
             .await?;
+        tracing::debug!("{customer}: approved sent");
         let _receipt = pending.get_receipt().await?;
+        tracing::debug!("{customer}: approved arrived");
     }
 
     // 6. transfer remain token to merchant
     let pending = contract
         .transferFrom(customer, merchant, real)
+        .gas_price(gas_price)
         .send()
         .await?;
+    tracing::debug!("{customer}: transfer real sent");
     let receipt = pending.get_receipt().await?;
+    tracing::debug!("{customer}: transfer real arrived");
 
-    if fee > U256::from(0) {
+    if fee > zero {
         let pending2 = contract
             .transferFrom(customer, maccount, fee)
+            .gas_price(gas_price)
             .send()
             .await?;
+        tracing::debug!("{customer}: transfer commission sent");
         let _ = pending2.get_receipt().await?;
+        tracing::debug!("{customer}: transfer commission arrived");
     }
 
     Ok((real, receipt.transaction_hash))
@@ -269,9 +289,9 @@ pub async fn get_token_decimal(token: Address, provider: impl Provider) -> Resul
 
 pub fn u256_to_i32(amount: U256, decimal: &u8) -> i32 {
     let res = if *decimal > 2 {
-        amount / U256::from(*decimal - 2)
+        amount / U256::from(10).pow(U256::from(*decimal - 2))
     } else {
-        amount / U256::from(*decimal)
+        amount * U256::from(10).pow(U256::from(2 - *decimal))
     };
 
     res.try_into().unwrap_or(0)
@@ -279,8 +299,8 @@ pub fn u256_to_i32(amount: U256, decimal: &u8) -> i32 {
 
 pub fn i32_to_u256(amount: i32, decimal: &u8) -> U256 {
     if *decimal > 2 {
-        U256::from(amount) * U256::from(*decimal - 2)
+        U256::from(amount) * U256::from(10).pow(U256::from(*decimal - 2))
     } else {
-        U256::from(amount) * U256::from(*decimal)
+        U256::from(amount) / U256::from(10).pow(U256::from(2 - *decimal))
     }
 }

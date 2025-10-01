@@ -42,7 +42,7 @@ pub trait ScannerStorage: Send + Sync + 'static {
         &self,
         address: &str,
     ) -> impl Future<Output = Result<(i32, i32, String)>> + Send;
-    fn contains_transaction(&self, tx: &str) -> impl Future<Output = Result<()>> + Send;
+    fn no_transaction(&self, tx: &str) -> impl Future<Output = Result<()>> + Send;
     fn deposited(
         &self,
         mid: i32,
@@ -152,6 +152,11 @@ impl<S: ScannerStorage> ScannerService<S> {
             match chain.chain_type {
                 ChainType::Evm => evm::Scanner::new(i, chain, sender.clone()).await?.run(),
             }
+            tracing::info!(
+                "{} scanning, main account: {}",
+                chain.chain_name,
+                chain.wallet.address()
+            );
         }
 
         tokio::spawn(self.listen(receiver));
@@ -191,14 +196,14 @@ impl<S: ScannerStorage> ScannerService<S> {
         let cs = customer.to_checksum(None);
         let tx = format!("{:?}", tx);
         let (mid, cid, merchant) = self.storage.contains_address(&cs).await?;
-        let _ = self.storage.contains_transaction(&tx).await?;
+        let _ = self.storage.no_transaction(&tx).await?;
         let merchant: Address = merchant.parse()?;
 
         // 2. save the new deposited
         let chain = &self.chains[index];
         let decimal = chain.decimals.get(&token).unwrap_or(&6);
         let amount = evm::u256_to_i32(value, decimal);
-        let did = self.storage.deposited(mid, cid, amount, tx).await?;
+        let did = self.storage.deposited(mid, cid, amount, tx.clone()).await?;
 
         // 2. generate customer secret key
         let (sk, _addr) = generate_eth(mid, cid, &self.mnemonics)?;
@@ -216,7 +221,11 @@ impl<S: ScannerStorage> ScannerService<S> {
             evm::i32_to_u256(chain.commission_min, decimal),
             evm::i32_to_u256(chain.commission_max, decimal),
         )
-        .await?;
+        .await
+        .map_err(|err| {
+            tracing::error!("TRANSFER: {tx} failed: {:?}", err);
+            err
+        })?;
 
         // 4. save the settled to deposit
         let settled_amount = evm::u256_to_i32(settled_amount, decimal);
