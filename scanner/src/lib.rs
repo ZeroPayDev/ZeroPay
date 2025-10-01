@@ -17,21 +17,22 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 /// Chain configure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScannerConfig {
-    chains: Vec<ChainConfig>,
+    pub chains: Vec<ChainConfig>,
 }
 
 /// Chain configure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChainConfig {
-    chain_type: String,
-    chain_name: String,
-    latency: i32,
-    commission: i32,
-    commission_min: i32,
-    commission_max: i32,
-    rpc: String,
-    admin: String,
-    tokens: Vec<String>,
+    pub chain_type: String,
+    pub chain_name: String,
+    pub latency: i32,
+    pub estimation: i32,
+    pub commission: i32,
+    pub commission_min: i32,
+    pub commission_max: i32,
+    pub rpc: String,
+    pub admin: String,
+    pub tokens: Vec<String>,
 }
 
 /// Main storage interface for Scanner used
@@ -114,7 +115,9 @@ impl<S: ScannerStorage> ScannerService<S> {
             let mut tokens = vec![];
             let mut decimals = HashMap::new();
             for t in config.tokens.iter() {
-                let token: Address = t.parse().unwrap();
+                let mut values = t.split(":");
+                let _ = values.next(); // token name
+                let token: Address = values.next().unwrap_or_default().parse()?;
                 let decimal = evm::get_token_decimal(token, provider.clone()).await?;
                 tokens.push(token);
                 decimals.insert(token, decimal);
@@ -153,9 +156,10 @@ impl<S: ScannerStorage> ScannerService<S> {
                 ChainType::Evm => evm::Scanner::new(i, chain, sender.clone()).await?.run(),
             }
             tracing::info!(
-                "{} scanning, main account: {}",
+                "{} scanning, main account: {}, tokens: {:?}",
                 chain.chain_name,
-                chain.wallet.address()
+                chain.wallet.address(),
+                chain.tokens,
             );
         }
 
