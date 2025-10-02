@@ -47,7 +47,7 @@ impl Scanner {
             index,
             latency: chain.latency as u64,
             rpc: chain.rpc.clone(),
-            tokens: chain.tokens.clone(),
+            tokens: chain.tokens.keys().map(|v| *v).collect(),
             event,
             last_scanned_block: chain.last_scanned_block as u64,
             sender,

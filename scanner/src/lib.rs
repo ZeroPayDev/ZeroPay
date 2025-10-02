@@ -48,13 +48,19 @@ pub trait ScannerStorage: Send + Sync + 'static {
     fn no_transaction(&self, tx: &str) -> impl Future<Output = Result<()>> + Send;
     fn deposited(
         &self,
+        identity: String,
         mid: i32,
         cid: i32,
         amount: i32,
         tx: String,
     ) -> impl Future<Output = Result<i32>> + Send;
-    fn settled(&self, did: i32, amount: i32, tx: String)
-    -> impl Future<Output = Result<()>> + Send;
+    fn settled(
+        &self,
+        identity: String,
+        did: i32,
+        amount: i32,
+        tx: String,
+    ) -> impl Future<Output = Result<()>> + Send;
 }
 
 enum ChainType {
@@ -79,7 +85,7 @@ struct Chain {
     commission_max: i32,
     rpc: Url,
     wallet: PrivateKeySigner,
-    tokens: Vec<Address>,
+    tokens: HashMap<Address, String>,
     decimals: HashMap<Address, u8>,
     last_scanned_block: i64,
 }
@@ -114,14 +120,15 @@ impl<S: ScannerStorage> ScannerService<S> {
             let provider = ProviderBuilder::new().connect_http(rpc.clone());
 
             // fetch token decimal and also test the rpc is work
-            let mut tokens = vec![];
+            let mut tokens = HashMap::new();
             let mut decimals = HashMap::new();
             for t in config.tokens.iter() {
                 let mut values = t.split(":");
-                let _ = values.next(); // token name
+                let name: String = values.next().unwrap_or_default().to_owned();
                 let token: Address = values.next().unwrap_or_default().parse()?;
                 let decimal = evm::get_token_decimal(token, provider.clone()).await?;
-                tokens.push(token);
+                let identity = format!("{}:{}", config.chain_name, name);
+                tokens.insert(token, identity);
                 decimals.insert(token, decimal);
             }
 
@@ -208,8 +215,16 @@ impl<S: ScannerStorage> ScannerService<S> {
         // 2. save the new deposited
         let chain = &self.chains[index];
         let decimal = chain.decimals.get(&token).unwrap_or(&6);
+        let identity = chain
+            .tokens
+            .get(&token)
+            .cloned()
+            .unwrap_or(chain.chain_name.clone());
         let amount = evm::u256_to_i32(value, decimal);
-        let did = self.storage.deposited(mid, cid, amount, tx.clone()).await?;
+        let did = self
+            .storage
+            .deposited(identity.clone(), mid, cid, amount, tx.clone())
+            .await?;
 
         // 2. generate customer secret key
         let (sk, _addr) = generate_eth(mid, cid, &self.mnemonics)?;
@@ -236,7 +251,10 @@ impl<S: ScannerStorage> ScannerService<S> {
         // 4. save the settled to deposit
         let settled_amount = evm::u256_to_i32(settled_amount, decimal);
         let settled_tx = format!("{:?}", settled_tx);
-        let _ = self.storage.settled(did, settled_amount, settled_tx).await;
+        let _ = self
+            .storage
+            .settled(identity, did, settled_amount, settled_tx)
+            .await;
 
         Ok(())
     }

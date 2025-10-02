@@ -53,7 +53,14 @@ impl scanner::ScannerStorage for Storage {
         }
     }
 
-    async fn deposited(&self, _mid: i32, cid: i32, amount: i32, tx: String) -> Result<i32> {
+    async fn deposited(
+        &self,
+        _identity: String,
+        _mid: i32,
+        cid: i32,
+        amount: i32,
+        tx: String,
+    ) -> Result<i32> {
         // 1. Save the deposit to the database
         let did = Deposit::insert(cid, amount, tx.clone(), &self.db)
             .await
@@ -97,7 +104,7 @@ impl scanner::ScannerStorage for Storage {
         Ok(did)
     }
 
-    async fn settled(&self, did: i32, amount: i32, tx: String) -> Result<()> {
+    async fn settled(&self, _identity: String, did: i32, amount: i32, tx: String) -> Result<()> {
         // 1. Save settled to deposit
         let _ = Deposit::settle(did, amount, tx, &self.db).await;
         let deposit = Deposit::get(did, &self.db)
