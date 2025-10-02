@@ -21,18 +21,38 @@ request:
 
 response:
 {
-  session_id: int,
-  customer: string,
-  pay_eth: string,
-  amount: int,
-  expired: DateTime,
-  completed: bool,
-  *session_url: string, # public payment session url, customer can use it to pay
-  *merchant: string,    # merchant name
-  *chains: [{           # supported chains
-    name: string,       # token name
-    address: string,    # token address
-  }]
+  session_id: int,          # session id
+  customer: string,         # customer name
+  pay_eth: string,          # eth-like chains payment address
+  amount: int,              # the amount of this session
+  expired: DateTime,        # the session expired time
+  completed: bool,          # the session is completed or not
+  *session_url: string,     # public payment session url, customer can use it to pay
+  *merchant: string,        # merchant name
+  *chains: [                # supported chains
+    {
+      name: string,         # chain name
+      estimation: int,      # estimated time to receive payment (seconds)
+      commission: int,      # commission rate 1-100(100%)
+      commission_min: int,  # commission minimum, e.g. 10($0.1)
+      commission_max: int,  # commission maximum, e.g. 100($1)
+      tokens: {
+        "USDT": {           # supported token
+          identity: string, # token identity
+          name: string,     # token name
+          address: string,  # token address
+        },
+        "USDC": {           # supported token
+          identity: string, # token identity
+          name: string,     # token name
+          address: string,  # token address
+        },
+      }
+    },
+    {
+      ...
+    }
+  ]
 }
 
 TIPS: * is platform-specific and is not required for standalone deployment.
