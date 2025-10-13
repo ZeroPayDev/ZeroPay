@@ -395,5 +395,5 @@ For higher limits, contact support or consider self-hosting.
 ## Support
 
 For questions and issues:
-- GitHub: [https://github.com/yourusername/zeropay/issues](https://github.com/yourusername/zeropay/issues)
+- GitHub: [https://github.com/ZeroPayDev/zeropay/issues](https://github.com/ZeroPayDev/zeropay/issues)
 - Platform Support: [https://zeropay.dev/support](https://zeropay.dev/support)

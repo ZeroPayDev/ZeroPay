@@ -3,7 +3,7 @@
 <div align="center">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/yourusername/zeropay)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/zeropaydev/zeropay)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org)
 
 An open-source, self-hosted payment gateway for stablecoins and cryptocurrency payments.
@@ -35,7 +35,7 @@ ZeroPay is a lightweight, self-hosted payment gateway that enables merchants to 
 
 ```bash
 # Pull the latest image
-docker pull <dockerhub-username>/zeropay:latest
+docker pull zeropaydev/zeropay:latest
 
 # Create configuration
 cp .env-template .env
@@ -47,7 +47,7 @@ docker run -d \
   -p 9000:9000 \
   --env-file .env \
   -v $(pwd)/config.toml:/app/config.toml \
-  <dockerhub-username>/zeropay:latest
+  zeropaydev/zeropay:latest
 ```
 
 ### Using Docker Compose
@@ -217,7 +217,7 @@ See [API.md](./API.md) for complete API documentation.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/zeropay.git
+git clone https://github.com/ZeroPayDev/zeropay.git
 cd zeropay
 
 # Build
@@ -238,60 +238,9 @@ zeropay/
 └── .env-template     # Environment template
 ```
 
-## Deployment
-
-### Docker Hub CI/CD
-
-This project includes automated Docker builds via GitHub Actions:
-
-1. **Setup Docker Hub credentials:**
-   - Create Docker Hub access token
-   - Add secrets to GitHub:
-     - `DOCKERHUB_USERNAME`
-     - `DOCKERHUB_TOKEN`
-
-2. **Automatic builds triggered by:**
-   - Push to `main` branch → `latest` tag
-   - Version tags (e.g., `v1.0.0`) → versioned tags
-
-3. **Multi-platform support:**
-   - `linux/amd64`
-   - `linux/arm64`
-
-See `.github/workflows/docker-publish.yml` for CI/CD configuration.
-
-## Production Deployment
-
-For production environments, we recommend:
-
-1. Use managed PostgreSQL and Redis services (AWS RDS, ElastiCache)
-2. Set up a reverse proxy (nginx) with SSL/TLS
-3. Enable automated backups
-4. Configure monitoring and alerting
-5. Use environment-specific configuration
-6. Implement rate limiting
-7. Regular security updates
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed production setup.
-
 ## Contributing
 
-We welcome contributions! Please follow these guidelines:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow Rust best practices and idioms
-- Add tests for new features
-- Update documentation
-- Ensure CI passes
-
-## Security
+We welcome contributions!
 
 ### Reporting Vulnerabilities
 
@@ -306,17 +255,6 @@ If you discover a security vulnerability, please email security@zeropay.dev inst
 - Use secure RPC endpoints
 - Enable firewall rules
 
-## Roadmap
-
-- [ ] Support for Bitcoin and Lightning Network
-- [ ] Non-EVM chain support (Solana, Cosmos, etc.)
-- [ ] Built-in exchange rate conversion
-- [ ] Payment links and QR codes
-- [ ] Subscription and recurring payments
-- [ ] Admin dashboard UI
-- [ ] Multi-merchant support
-- [ ] Advanced analytics
-
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
@@ -324,8 +262,8 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ## Support
 
 - **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/zeropay/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/zeropay/discussions)
+- **Issues**: [GitHub Issues](https://github.com/ZeroPayDev/zeropay/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ZeroPayDev/zeropay/discussions)
 - **Platform Support**: support@zeropay.dev
 
 ## Acknowledgments
@@ -343,6 +281,6 @@ Built with:
 
 Made with ❤️ by the ZeroPay community
 
-[Website](https://zeropay.dev) • [GitHub](https://github.com/yourusername/zeropay) • [Twitter](https://twitter.com/zeropaydev)
+[Website](https://zeropay.dev) • [GitHub](https://github.com/ZeroPayDev/zeropay) • [Twitter](https://twitter.com/zeropaydev)
 
 </div>

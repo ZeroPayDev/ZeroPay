@@ -35,7 +35,7 @@ This guide provides detailed instructions for deploying ZeroPay either using Doc
 
 1. **Pull the latest image:**
    ```bash
-   docker pull <dockerhub-username>/zeropay:latest
+   docker pull zeropaydev/zeropay:latest
    ```
 
 2. **Create environment configuration:**
@@ -79,7 +79,7 @@ This guide provides detailed instructions for deploying ZeroPay either using Doc
      -p 9000:9000 \
      --env-file .env \
      -v $(pwd)/config.toml:/app/config.toml \
-     <dockerhub-username>/zeropay:latest
+     zeropaydev/zeropay:latest
    ```
 
 ### Using Docker Compose
@@ -109,7 +109,7 @@ services:
       - redis_data:/data
 
   zeropay:
-    image: <dockerhub-username>/zeropay:latest
+    image: zeropaydev/zeropay:latest
     depends_on:
       - postgres
       - redis
@@ -186,7 +186,7 @@ cargo --version
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/zeropay.git
+git clone https://github.com/ZeroPayDev/zeropay.git
 cd zeropay
 
 # Build in release mode
@@ -364,5 +364,5 @@ For production environments:
 ## Support
 
 For issues and questions:
-- GitHub Issues: [https://github.com/yourusername/zeropay/issues](https://github.com/yourusername/zeropay/issues)
+- GitHub Issues: [https://github.com/ZeroPayDev/zeropay/issues](https://github.com/ZeroPayDev/zeropay/issues)
 - Documentation: See [API.md](./API.md) for API reference
