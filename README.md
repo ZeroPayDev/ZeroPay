@@ -244,7 +244,7 @@ We welcome contributions!
 
 ### Reporting Vulnerabilities
 
-If you discover a security vulnerability, please email security@zeropay.dev instead of using the issue tracker.
+If you discover a security vulnerability, please email hi@zeropay.dev instead of using the issue tracker.
 
 ### Best Practices
 
@@ -264,18 +264,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 - **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md)
 - **Issues**: [GitHub Issues](https://github.com/ZeroPayDev/zeropay/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/ZeroPayDev/zeropay/discussions)
-- **Platform Support**: support@zeropay.dev
-
-## Acknowledgments
-
-Built with:
-- [Rust](https://www.rust-lang.org/) - Systems programming language
-- [Axum](https://github.com/tokio-rs/axum) - Web framework
-- [Alloy](https://github.com/alloy-rs/alloy) - Ethereum library
-- [SQLx](https://github.com/launchbadge/sqlx) - SQL toolkit
-- [Redis](https://redis.io/) - In-memory data store
-
----
+- **Platform Support**: hi@zeropay.dev
 
 <div align="center">
 
