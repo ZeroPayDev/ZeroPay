@@ -31,30 +31,52 @@ ZeroPay is a lightweight, self-hosted payment gateway that enables merchants to 
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### Using Docker Compose (Recommended)
+
+The easiest way to run ZeroPay with all dependencies:
+
+1. **Configure your settings:**
+
+   Edit `docker-compose.yml` environment variables:
+   ```yaml
+   environment:
+     - MNEMONICS=your twelve or twenty four word mnemonic phrase
+     - WALLET=0xYourWalletAddress
+     - APIKEY=your-secure-api-key
+     - WEBHOOK=https://your-webhook-url.com
+   ```
+
+2. **Configure blockchain:**
+
+   Edit `config.toml` with your chain settings (RPC URL, tokens, etc.)
+
+3. **Start all services:**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Check logs:**
+   ```bash
+   docker-compose logs -f zeropay
+   ```
+
+### Using Docker Standalone
 
 ```bash
 # Pull the latest image
 docker pull zeropaydev/zeropay:latest
 
-# Create configuration
-cp .env-template .env
-# Edit .env with your settings
-
-# Run the container
+# Run with environment variables
 docker run -d \
   --name zeropay \
   -p 9000:9000 \
-  --env-file .env \
+  -e DATABASE_URL=postgres://user:pass@host:5432/zeropay \
+  -e REDIS_URL=redis://host:6379 \
+  -e MNEMONICS="your mnemonic phrase" \
+  -e WALLET=0xYourWallet \
+  -e APIKEY=your-api-key \
   -v $(pwd)/config.toml:/app/config.toml \
   zeropaydev/zeropay:latest
-```
-
-### Using Docker Compose
-
-```bash
-# Start all services (PostgreSQL, Redis, ZeroPay)
-docker-compose up -d
 ```
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
@@ -142,23 +164,21 @@ For a hassle-free experience, use our managed platform at [zeropay.dev](https://
 
 ### Environment Variables
 
-Create a `.env` file from the template:
+**For Docker Compose:** Edit the `environment` section in `docker-compose.yml`
 
-```bash
-cp .env-template .env
-```
+**For local development:** Create a `.env` file or set as environment variables
 
 Key configuration options:
 
 ```bash
-PORT=9000                                           # API server port
-DATABASE_URL=postgres://user:pass@localhost/zeropay # PostgreSQL connection
-REDIS=redis://127.0.0.1:6379                        # Redis connection
-MNEMONICS="your twelve or twenty-four word phrase"  # BIP39 seed phrase
-WALLET=0xa0..00                                     # Settlement wallet address
-APIKEY=your-secure-api-key                          # API authentication key
-WEBHOOK=https://your-app.com/webhook                # Webhook endpoint URL
-SCANNER_CONFIG=config.toml                          # Chain config file path
+PORT=9000                                            # API server port
+DATABASE_URL=postgres://user:pass@host:5432/zeropay # PostgreSQL connection
+REDIS_URL=redis://host:6379                          # Redis connection
+MNEMONICS=your twelve or twenty-four word phrase     # BIP39 seed phrase
+WALLET=0xa0..00                                      # Settlement wallet address
+APIKEY=your-secure-api-key                           # API authentication key
+WEBHOOK=https://your-app.com/webhook                 # Webhook endpoint URL
+SCANNER_CONFIG=config.toml                           # Chain config file path
 ```
 
 ### Chain Configuration

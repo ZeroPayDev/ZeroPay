@@ -1,11 +1,11 @@
 [[chains]]
 chain_type="evm"
-chain_name="ethereum"
-latency=6
-estimation=72 # received money estimation time: 12(block time) * 6 (latency)
-commission=5 # 5% commission rate, if 0, no commission
-commission_min=50 # min is $0.5
-commission_max=200 # max is $2.00
-admin="xxxxxxxx" # use your admin account private key 0xaa..00 (pay gas)
-rpc="https://eth-mainnet.g.alchemy.com/<api-key>" # use your own rpc
-tokens=["USDT:0xdAC17F958D2ee523a2206206994597C13D831ec7", "USDC:0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"]
+chain_name="Sepolia"
+latency=1
+estimation=12
+commission=5
+commission_min=50
+commission_max=200
+rpc="https://ethereum-sepolia.blockpi.network/v1/rpc/6753677de8aba6408d0f9ae8fb74496c727c1ebc"
+admin="0x839d8f0a6cf6e4241b349399d21385826413c181d4597e36c66b8085153d0872"
+tokens=["USDS:0x0dE254a722BD16C2E647B444C448D2a911deb8d5"]
