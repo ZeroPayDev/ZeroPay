@@ -82,54 +82,53 @@ This guide provides detailed instructions for deploying ZeroPay either using Doc
      zeropaydev/zeropay:latest
    ```
 
-### Using Docker Compose
+### Using Docker Compose (Recommended)
 
-Create a `docker-compose.yml` file:
+The project includes a `docker-compose.yml` file that sets up PostgreSQL, Redis, and ZeroPay with all required configuration.
 
-```yaml
-version: '3.8'
+1. **Configure your blockchain settings:**
 
-services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: zeropay
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+   Edit `config.toml` to configure supported blockchain networks:
+   ```toml
+   [[chains]]
+   chain_type="evm"
+   chain_name="Sepolia"
+   latency=1
+   estimation=12
+   commission=5
+   commission_min=50
+   commission_max=200
+   admin="0xYourAdminPrivateKey"
+   rpc="https://ethereum-sepolia.blockpi.network/v1/rpc/YOUR-API-KEY"
+   tokens=["USDT:0xTokenAddress"]
+   ```
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+2. **Edit docker-compose.yml environment variables:**
 
-  zeropay:
-    image: zeropaydev/zeropay:latest
-    depends_on:
-      - postgres
-      - redis
-    ports:
-      - "9000:9000"
-    env_file:
-      - .env
-    volumes:
-      - ./config.toml:/app/config.toml
-    restart: unless-stopped
+   Update the `zeropay` service environment section in `docker-compose.yml`:
+   ```yaml
+   environment:
+     - PORT=9000
+     - DATABASE_URL=postgres://postgres:postgres@zeropay-postgres:5432/zeropay
+     - REDIS_URL=redis://zeropay-redis:6379
+     - SCANNER_CONFIG=config.toml
+     - MNEMONICS=your twelve or twenty four word mnemonic phrase
+     - WALLET=0xYourWalletAddress
+     - APIKEY=your-secure-api-key
+     - WEBHOOK=https://your-webhook-url.com
+   ```
 
-volumes:
-  postgres_data:
-  redis_data:
-```
+3. **Start all services:**
+   ```bash
+   docker-compose up -d
+   ```
 
-Start all services:
-```bash
-docker-compose up -d
-```
+4. **View logs:**
+   ```bash
+   docker-compose logs -f zeropay
+   ```
+
+**Note:** All configuration is now in `docker-compose.yml`. The `.env` file is optional and only needed for local development without Docker.
 
 ### Building Docker Image Locally
 
@@ -238,13 +237,16 @@ Redis requires no additional setup. Ensure it's running and accessible at the UR
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `PORT` | API server port | `9000` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@localhost/zeropay` |
-| `REDIS` | Redis connection string | `redis://127.0.0.1:6379` |
-| `MNEMONICS` | BIP39 seed phrase for wallet generation | `"word1 word2 ... word12"` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@host:5432/zeropay` |
+| `REDIS_URL` | Redis connection string | `redis://host:6379` |
+| `MNEMONICS` | BIP39 seed phrase for wallet generation | `word1 word2 ... word12` |
 | `WALLET` | Main settlement wallet address | `0xa0..00` |
 | `APIKEY` | API key for authentication | `your-secure-key` |
 | `WEBHOOK` | Webhook URL for payment notifications | `https://your-app.com/webhook` |
 | `SCANNER_CONFIG` | Path to chain configuration file | `config.toml` |
+
+**For Docker Compose:** Set these in the `environment` section of `docker-compose.yml`
+**For local development:** Set these in `.env` file or as environment variables
 
 ### Chain Configuration (`config.toml`)
 

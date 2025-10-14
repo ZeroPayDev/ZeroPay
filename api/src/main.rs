@@ -106,6 +106,8 @@ async fn main() {
     // setup redis connection
     let redis = match RedisClient::open(args.redis.clone()) {
         Ok(client) => {
+            // try connect to check
+            let _ = client.get_multiplexed_async_connection().await.unwrap();
             info!("✅ Redis connection established!");
             client
         }

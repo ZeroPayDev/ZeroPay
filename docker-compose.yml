@@ -1,52 +1,61 @@
-version: '3.8'
+version: '3'
 
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: zeropay-postgres
+    restart: unless-stopped
+    expose:
+      - 5432
     environment:
       POSTGRES_DB: zeropay
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - .data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    container_name: zeropay-redis
+    restart: unless-stopped
+    expose:
+      - 6379
     volumes:
-      - redis_data:/data
+      - .data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   zeropay:
     image: zeropaydev/zeropay:latest
+    container_name: zeropay-api
+    restart: unless-stopped
+    ports:
+      - 9000:9000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "9000:9000"
-    env_file:
-      - .env
     volumes:
       - ./config.toml:/app/config.toml
-    restart: unless-stopped
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres/zeropay
-      - REDIS=redis://redis:6379
+      - PORT=9000
+      - DATABASE_URL=postgres://postgres:postgres@zeropay-postgres:5432/zeropay
+      - REDIS_URL=redis://zeropay-redis:6379
+      - SCANNER_CONFIG=config.toml
+      - MNEMONICS="12/24 words" # your mnemonics code for generate accounts
+      - WALLET=0x00xxx00        # your received money account
+      - APIKEY=thisisapikey     # your service apikey when create/query sessions
+      - WEBHOOK=https://xx.com  # your webhook url
 
-volumes:
-  postgres_data:
-  redis_data:
+networks:
+  default:
+    name: zeropay
