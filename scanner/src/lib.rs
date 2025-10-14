@@ -35,6 +35,7 @@ pub struct ChainConfig {
     pub rpc: String,
     pub admin: String,
     pub tokens: Vec<String>,
+    pub subscription: Option<String>,
 }
 
 /// Main storage interface for Scanner used
@@ -87,18 +88,41 @@ struct Chain {
     wallet: PrivateKeySigner,
     tokens: HashMap<Address, String>,
     decimals: HashMap<Address, u8>,
+    subscription: Option<Address>,
     last_scanned_block: i64,
 }
 
+/// Deposit with different chains
 pub enum ChainDeposit {
-    // token_address, to_address, amount, tx_hash
+    /// token_address, to_address, amount, tx_hash
     Evm(Address, Address, U256, B256),
+}
+
+/// Unified plan/subscription interface
+pub enum ChainSubscription {
+    Evm(ChainEvmSubscription),
+}
+
+/// Evm-based plan/subscription interface
+pub enum ChainEvmSubscription {
+    /// claimed the subscription: subscription id
+    Claimed(U256),
+    /// New plan: plan id, merchant, amount, period, tx
+    PlanStarted(U256, Address, U256, U256, B256),
+    /// Cancel plan: plan id
+    PlanCanceled(U256),
+    /// New subscription: subscription id, plan id, customer, payer, token, nextTime, tx
+    SubscriptionStarted(U256, U256, Address, Address, Address, U256, B256),
+    /// Cancel subscription: subscription id
+    SubscriptionCanceled(U256),
 }
 
 /// Scanner service message
 pub enum ScannerMessage {
     /// new deposit, chain_id, deposit
     Deposit(usize, ChainDeposit),
+    /// Subscription payment or plan
+    Subscription(usize, ChainSubscription),
     /// scanned block number
     Scanned(usize, i64),
 }
@@ -131,6 +155,7 @@ impl<S: ScannerStorage> ScannerService<S> {
                 tokens.insert(token, identity);
                 decimals.insert(token, decimal);
             }
+            let subscription: Option<Address> = config.subscription.and_then(|s| s.parse().ok());
 
             let last_scanned_block = storage.get_scanned_block(&config.chain_name).await?;
 
@@ -145,6 +170,7 @@ impl<S: ScannerStorage> ScannerService<S> {
                 wallet,
                 tokens,
                 decimals,
+                subscription,
                 last_scanned_block,
             });
         }
@@ -185,6 +211,9 @@ impl<S: ScannerStorage> ScannerService<S> {
                             .handle_evm_deposit(index, token, customer, value, tx)
                             .await;
                     }
+                },
+                Some(ScannerMessage::Subscription(index, msg)) => match msg {
+                    ChainSubscription::Evm(emsg) => self.handle_evm_subsctiption(index, emsg).await,
                 },
                 Some(ScannerMessage::Scanned(index, block)) => {
                     let _ = self
@@ -257,6 +286,34 @@ impl<S: ScannerStorage> ScannerService<S> {
             .await;
 
         Ok(())
+    }
+
+    async fn handle_evm_subscription(&self, index: usize, msg: ChainEvmSubscription) -> Result<()> {
+        match msg {
+            ChainEvmSubscription::Claimed(id) => {
+                //
+            }
+            ChainEvmSubscription::PlanStarted(plan, merchant, amount, period, tx) => {
+                //
+            }
+            ChainEvmSubscription::PlanCanceled(plan) => {
+                //
+            }
+            ChainEvmSubscription::SubscriptionStarted(
+                id,
+                plan,
+                customer,
+                payer,
+                token,
+                next_time,
+                tx,
+            ) => {
+                //
+            }
+            ChainEvmSubscription::SubscriptionCanceled(id) => {
+                //
+            }
+        }
     }
 }
 

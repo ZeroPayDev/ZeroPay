@@ -1,11 +1,14 @@
+mod pay;
+mod sub;
+
+pub use pay::transfer;
+pub use sub::claim;
+
 use crate::{Chain, ChainDeposit, ScannerMessage};
 use alloy::{
-    network::TransactionBuilder,
     primitives::{Address, B256, U256},
     providers::{Provider, ProviderBuilder},
-    rpc::types::TransactionRequest,
     rpc::types::{Filter, Log},
-    signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
     transports::http::reqwest::Url,
@@ -23,14 +26,21 @@ sol!(
     "ERC20.json"
 );
 
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    EvmSubscription,
+    "Subscription.json"
+);
+
 // Scanner state to track progress
 #[derive(Debug)]
 pub struct Scanner {
     index: usize,
     latency: u64,
     rpc: Url,
-    tokens: Vec<Address>,
-    event: B256,
+    contracts: Vec<Address>,
+    events: Vec<B256>,
     last_scanned_block: u64,
     sender: UnboundedSender<ScannerMessage>,
 }
@@ -41,14 +51,26 @@ impl Scanner {
         chain: &Chain,
         sender: UnboundedSender<ScannerMessage>,
     ) -> Result<Self> {
-        let event = EvmToken::Transfer::SIGNATURE_HASH;
+        let mut events = vec![EvmToken::Transfer::SIGNATURE_HASH];
+        let mut contracts = chain.tokens.keys().map(|v| *v).collect();
+
+        if let Some(s) = chain.subscription {
+            events.extend([
+                EvmSubscription::PlanStarted,
+                EvmSubscription::PlanCanceled,
+                EvmSubscription::SubscriptionStarted,
+                EvmSubscription::SubscriptionCanceled,
+                EvmSubscription::SubscriptionClaimed,
+            ]);
+            contracts.push(s);
+        }
 
         let mut scan = Self {
             index,
             latency: chain.latency as u64,
             rpc: chain.rpc.clone(),
-            tokens: chain.tokens.keys().map(|v| *v).collect(),
-            event,
+            contracts,
+            events,
             last_scanned_block: chain.last_scanned_block as u64,
             sender,
         };
@@ -73,14 +95,14 @@ impl Scanner {
 
         // Create filter for Transfer events from our monitored tokens
         let filter = Filter::new()
-            .address(self.tokens.clone())
-            .event_signature(self.event)
+            .address(self.contracts.clone())
+            .event_signature(self.events.clone())
             .from_block(from_block)
             .to_block(to_block);
 
         let logs = provider.get_logs(&filter).await?;
         for log in logs {
-            if let Err(err) = self.handle_transfer_event(log) {
+            if let Err(err) = self.handle_event(log) {
                 tracing::error!("Parse event error: {:?}", err);
             }
         }
@@ -89,24 +111,116 @@ impl Scanner {
     }
 
     // Parse a log into a TransferEvent
-    fn handle_transfer_event(&self, log: Log) -> Result<()> {
+    fn handle_event(&self, log: Log) -> Result<()> {
         // ERC20 Transfer event signature: Transfer(address,address,uint256)
-        let event = EvmToken::Transfer::decode_log(&log.inner)?;
-        tracing::debug!("Fetch event: {}-{}:{}", event.from, event.to, event.value);
 
-        // Send deposit message for processing
-        let _ = self.sender.send(ScannerMessage::Deposit(
-            self.index,
-            ChainDeposit::Evm(
-                log.address(), // token address
+        if let Ok(event) = EvmToken::Transfer::decode_log(&log.inner) {
+            tracing::debug!(
+                "Fetch transfer: {}-{}:{}",
+                event.from,
                 event.to,
-                event.value,
-                log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
-            ),
-        ));
+                event.value
+            );
 
-        // block_number: log.block_number.unwrap_or(0),
-        // log_index: log.log_index.unwrap_or(0),
+            // Send deposit message for processing
+            let _ = self.sender.send(ScannerMessage::Deposit(
+                self.index,
+                ChainDeposit::Evm(
+                    log.address(), // token address
+                    event.to,
+                    event.value,
+                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ),
+            ));
+
+            // block_number: log.block_number.unwrap_or(0),
+            // log_index: log.log_index.unwrap_or(0),
+            return Ok(());
+        }
+
+        if let Ok(event) = EvmSubscription::SubscriptionClaimed::decode_log(&log.inner) {
+            tracing::debug!("Fetch subscription claimed: {}-{}:{}", event.id);
+
+            // Send deposit message for processing
+            let _ = self.sender.send(ScannerMessage::Subscription(
+                self.index,
+                ChainSubscription::Claimed(
+                    event.id,
+                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ),
+            ));
+
+            return Ok(());
+        }
+
+        if let Ok(event) = EvmSubscription::PlanStarted::decode_log(&log.inner) {
+            tracing::debug!("Fetch plan started: {}:{}", event.id, event.merchant);
+
+            // Send deposit message for processing
+            let _ = self.sender.send(ScannerMessage::Plan(
+                self.index,
+                ChainPlan::PlanStarted(
+                    event.id,
+                    event.merchant,
+                    event.amount,
+                    event.period,
+                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ),
+            ));
+
+            return Ok(());
+        }
+
+        if let Ok(event) = EvmSubscription::PlanCanceled::decode_log(&log.inner) {
+            tracing::debug!("Fetch plan canceled: {}", event.id);
+
+            // Send deposit message for processing
+            let _ = self.sender.send(ScannerMessage::Plan(
+                self.index,
+                ChainPlan::PlanCanceled(
+                    event.id,
+                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ),
+            ));
+
+            return Ok(());
+        }
+
+        if let Ok(event) = EvmSubscription::SubscriptionStarted::decode_log(&log.inner) {
+            tracing::debug!("Fetch subscription started: {}", event.id);
+
+            // Send deposit message for processing
+            let _ = self.sender.send(ScannerMessage::Plan(
+                self.index,
+                ChainPlan::SubscriptionStarted(
+                    event.id,
+                    event.plan,
+                    event.customer,
+                    event.payer,
+                    event.token,
+                    event.nextTime,
+                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ),
+            ));
+
+            return Ok(());
+        }
+
+        if let Ok(event) = EvmSubscription::SubscriptionCanceled::decode_log(&log.inner) {
+            tracing::debug!("Fetch subscription canceled: {}", event.id);
+
+            // Send deposit message for processing
+            let _ = self.sender.send(ScannerMessage::Plan(
+                self.index,
+                ChainPlan::SubscriptionCanceled(
+                    event.id,
+                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ),
+            ));
+
+            return Ok(());
+        }
+
         Ok(())
     }
 
@@ -172,114 +286,6 @@ impl Scanner {
             }
         });
     }
-}
-
-// transfer token from deposit to admin, return real merchant amount
-pub async fn transfer(
-    customer: Address,
-    merchant: Address,
-    token: Address,
-    wallet: PrivateKeySigner,
-    main: PrivateKeySigner,
-    url: Url,
-    commission_rate: i32,
-    commission_min: U256,
-    commission_max: U256,
-) -> Result<(U256, B256)> {
-    let zero = U256::from(0);
-    let maccount = main.address();
-    let provider = ProviderBuilder::new()
-        .wallet(main)
-        .connect_http(url.clone());
-    let gas_price = provider.get_gas_price().await? * 105 / 100; // add 5%
-    let contract = EvmToken::new(token, provider.clone());
-
-    // 1. check token balance
-    let balance: U256 = contract.balanceOf(customer).call().await?;
-
-    if balance == zero {
-        return Err(anyhow::anyhow!("No balance"));
-    }
-
-    // 3. check approve or not
-    let approved: U256 = contract.allowance(customer, maccount).call().await?;
-    let need_approve = approved < balance;
-
-    // 2. collect gas used, and do a discount in the amount
-    let approve_gas = if need_approve {
-        let gas = contract
-            .approve(maccount, U256::from(100000000_000000i64))
-            .gas_price(gas_price)
-            .estimate_gas()
-            .await?;
-        // add more 5%
-        U256::from(gas * 105 / 100) * U256::from(gas_price)
-    } else {
-        zero
-    };
-    tracing::debug!("{customer}: approve_gas: {approve_gas}");
-
-    let fee = if commission_rate > 0 {
-        let rate = balance * U256::from(commission_rate) / U256::from(100);
-        let rate_max = core::cmp::min(rate, commission_max);
-        core::cmp::max(rate_max, commission_min)
-    } else {
-        zero
-    };
-    let real = balance - fee;
-    tracing::info!("{customer}: commission: {fee}, real: {real}");
-
-    if need_approve {
-        // 4. if not approve, transfer approve gas to it
-        let ttx = TransactionRequest::default()
-            .with_to(customer)
-            .with_value(approve_gas);
-        let pending = provider.send_transaction(ttx).await?;
-        tracing::debug!("{customer}: approve gas sent");
-        let _receipt = pending.get_receipt().await?;
-        tracing::debug!("{customer}: approve gas arrived");
-
-        // 5. approve tokens to max
-        let customer_provider = ProviderBuilder::new().wallet(wallet).connect_http(url);
-        let customer_contract = EvmToken::new(token, customer_provider);
-        let total = customer_contract
-            .totalSupply()
-            .call()
-            .await
-            .unwrap_or(U256::from(100000000_000000i64));
-
-        let pending = customer_contract
-            .approve(maccount, total)
-            .gas_price(gas_price)
-            .send()
-            .await?;
-        tracing::debug!("{customer}: approved sent");
-        let _receipt = pending.get_receipt().await?;
-        tracing::debug!("{customer}: approved arrived");
-    }
-
-    // 6. transfer remain token to merchant
-    let pending = contract
-        .transferFrom(customer, merchant, real)
-        .gas_price(gas_price)
-        .send()
-        .await?;
-    tracing::debug!("{customer}: transfer real sent");
-    let receipt = pending.get_receipt().await?;
-    tracing::debug!("{customer}: transfer real arrived");
-
-    if fee > zero {
-        let pending2 = contract
-            .transferFrom(customer, maccount, fee)
-            .gas_price(gas_price)
-            .send()
-            .await?;
-        tracing::debug!("{customer}: transfer commission sent");
-        let _ = pending2.get_receipt().await?;
-        tracing::debug!("{customer}: transfer commission arrived");
-    }
-
-    Ok((real, receipt.transaction_hash))
 }
 
 pub async fn get_token_decimal(token: Address, provider: impl Provider) -> Result<u8> {
