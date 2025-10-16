@@ -1,3 +1,6 @@
+use serde_json::Value;
+use std::collections::HashMap;
+
 /// When a resource server requires payment, it responds with a payment required signal and a JSON payload containing payment requirements
 pub struct PaymentRequirementsResponse {
     /// Protocol version identifier
@@ -84,48 +87,87 @@ pub struct SettlementResponse {
     pub payer: String,
 }
 
-pub trait PaymentScheme {
-    /// The facilitator performs the following verification steps:
-    /// 1. Signature Validation: Verify the EIP-712 signature is valid and properly signed by the payer
-    /// 2. Balance Verification: Confirm the payer has sufficient token balance for the transfer
-    /// 3. Amount Validation: Ensure the payment amount meets or exceeds the required amount
-    /// 4. Time Window Check: Verify the authorization is within its valid time range
-    /// 5. Parameter Matching: Confirm authorization parameters match the original payment requirements
-    /// 6. Transaction Simulation: Simulate the transferWithAuthorization transaction to ensure it would succeed
-    fn verify() -> bool;
-
-    /// Settlement is performed by calling the transferWithAuthorization function on the ERC-20 contract with the signature and authorization parameters provided in the payment payload.
-    fn settle() -> bool;
-}
-
+/// The request of verify and settle payment by scheme
 pub struct VerifyRequest {
+    /// The payload information
     pub paymentPayload: PaymentPayload,
+    /// The payment requirement
     pub paymentRequirements: PaymentRequirements,
 }
 
+/// The response of verify payment
 pub struct VerifyResponse {
+    /// Whether the payment verify was successful
     isValid: bool,
+    /// Address of the payer's wallet
     payer: String,
+    /// Error reason if verify failed (omitted if successful)
     invalidReason: Option<String>,
 }
 
 impl VerifyRequest {
-    pub fn verify(&self) -> VerifyResponse {
-        //
+    /// The scheme of this payment request
+    fn scheme(&self) -> &str {
+        &self.paymentRequirements.scheme
     }
 
-    pub fn settle(&self) -> SettlementResponse {
-        //
+    /// The network of this payment request
+    fn network(&self) -> &str {
+        &self.paymentRequirements.network
+    }
+
+    /// The asset of this payment request
+    fn asset(&self) -> &str {
+        &self.paymentRequirements.asset
+    }
+
+    /// The payer of this payment request
+    fn payer(&self) -> &str {
+        &self.paymentPayload.payload.authorization.from
+    }
+
+    /// verify the request by scheme
+    pub fn verify(&self, registry: &PaymentSchemeRegistry) -> VerifyResponse {
+        if let Some(scheme) = registry.from_request(self) {
+            scheme.verify()
+        } else {
+            VerifyResponse {
+                isValid: false,
+                invalidReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
+                payer: self.payer().to_owned(),
+            }
+        }
+    }
+
+    /// settle the request by scheme
+    pub fn settle(&self, registry: &PaymentSchemeRegistry) -> SettlementResponse {
+        if let Some(scheme) = registry.from_request(self) {
+            scheme.settle()
+        } else {
+            SettlementResponse {
+                success: false,
+                errorReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
+                transaction: "".to_owned(),
+                network: self.network().to_owned(),
+                payer: self.payer().to_owned(),
+            }
+        }
     }
 }
 
+/// List supported payment schemes.
 pub struct SupportedResponse {
+    /// The items of the schemes
     kinds: Vec<SupportedScheme>,
 }
 
+/// The supported scheme
 pub struct SupportedScheme {
+    /// Protocol version supported by the resource
     x402Version: i32,
+    /// Payment scheme identifier (e.g., "exact")
     scheme: String,
+    /// Blockchain network identifier (e.g., "base-sepolia", "ethereum-mainnet")
     network: String,
 }
 
@@ -210,7 +252,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn to_code(&self) -> (&str, &str) {
+    pub fn to_code(&self) -> (&'static str, &'static str) {
         match self {
             Error::InsufficientFunds => (
                 "insufficient_funds",
@@ -272,5 +314,79 @@ impl Error {
                 "Unexpected error occurred during payment settlement",
             ),
         }
+    }
+}
+
+pub trait PaymentScheme: Sync {
+    /// Get the scheme identifier, now we use scheme + network
+    fn identity() -> String
+    where
+        Self: Sized,
+    {
+        format!("{}-{}-{}", Self::scheme(), Self::network(), Self::asset())
+    }
+
+    /// The scheme of this payment scheme
+    fn scheme() -> &'static str
+    where
+        Self: Sized;
+
+    /// The network of this payment scheme
+    fn network() -> &'static str
+    where
+        Self: Sized;
+
+    /// The asset of this payment scheme
+    fn asset() -> &'static str
+    where
+        Self: Sized;
+
+    /// Build new payment scheme by verify/settle request
+    fn from_request(req: &VerifyRequest) -> Self
+    where
+        Self: Sized;
+
+    /// The facilitator performs the following verification steps:
+    /// 1. Signature Validation: Verify the EIP-712 signature is valid and properly signed by the payer
+    /// 2. Balance Verification: Confirm the payer has sufficient token balance for the transfer
+    /// 3. Amount Validation: Ensure the payment amount meets or exceeds the required amount
+    /// 4. Time Window Check: Verify the authorization is within its valid time range
+    /// 5. Parameter Matching: Confirm authorization parameters match the original payment requirements
+    /// 6. Transaction Simulation: Simulate the transferWithAuthorization transaction to ensure it would succeed
+    fn verify(&self) -> VerifyResponse;
+
+    /// Settlement is performed by calling the transferWithAuthorization
+    /// function on the ERC-20 contract with the signature and authorization
+    /// parameters provided in the payment payload.
+    fn settle(&self) -> SettlementResponse;
+}
+
+/// The main registry for all payment scheme
+pub struct PaymentSchemeRegistry {
+    schemes: HashMap<String, fn(req: &VerifyRequest) -> Box<dyn PaymentScheme>>,
+}
+
+impl PaymentSchemeRegistry {
+    /// Create new registry
+    pub fn new() -> Self {
+        Self {
+            schemes: HashMap::new(),
+        }
+    }
+
+    /// Register new payment scheme to it
+    pub fn register<T: PaymentScheme + 'static>(&mut self)
+    where
+        T: Sync,
+    {
+        let identity = T::identity();
+        self.schemes
+            .insert(identity, |req| Box::new(T::from_request(req)));
+    }
+
+    /// Create new payment scheme from verify/settle request
+    pub fn from_request(&self, req: &VerifyRequest) -> Option<Box<dyn PaymentScheme>> {
+        let identity = format!("{}-{}-{}", req.scheme(), req.network(), req.asset());
+        self.schemes.get(&identity).map(|f| f(req))
     }
 }
