@@ -47,7 +47,7 @@ impl Scanner {
             index,
             latency: chain.latency as u64,
             rpc: chain.rpc.clone(),
-            tokens: chain.tokens.keys().map(|v| *v).collect(),
+            tokens: chain.tokens.keys().copied().collect(),
             event,
             last_scanned_block: chain.last_scanned_block as u64,
             sender,
@@ -175,6 +175,7 @@ impl Scanner {
 }
 
 // transfer token from deposit to admin, return real merchant amount
+#[allow(clippy::too_many_arguments)]
 pub async fn transfer(
     customer: Address,
     merchant: Address,
@@ -208,7 +209,7 @@ pub async fn transfer(
     // 2. collect gas used, and do a discount in the amount
     let approve_gas = if need_approve {
         let gas = contract
-            .approve(maccount, U256::from(100000000_000000i64))
+            .approve(maccount, U256::from(100_000_000_000_000i64))
             .gas_price(gas_price)
             .estimate_gas()
             .await?;
@@ -246,7 +247,7 @@ pub async fn transfer(
             .totalSupply()
             .call()
             .await
-            .unwrap_or(U256::from(100000000_000000i64));
+            .unwrap_or(U256::from(100_000_000_000_000i64));
 
         let pending = customer_contract
             .approve(maccount, total)

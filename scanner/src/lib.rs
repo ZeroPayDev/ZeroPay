@@ -215,7 +215,7 @@ impl<S: ScannerStorage> ScannerService<S> {
         let cs = customer.to_checksum(None);
         let tx = format!("{:?}", tx);
         let (mid, cid, merchant) = self.storage.contains_address(&cs).await?;
-        let _ = self.storage.no_transaction(&tx).await?;
+        self.storage.no_transaction(&tx).await?;
         let merchant: Address = merchant.parse()?;
 
         // 2. save the new deposited
