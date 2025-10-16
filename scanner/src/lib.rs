@@ -100,19 +100,19 @@ pub enum ChainDeposit {
 
 /// Unified plan/subscription interface
 pub enum ChainSubscription {
-    Evm(ChainEvmSubscription),
+    Evm(ChainEvmSubscription, B256),
 }
 
 /// Evm-based plan/subscription interface
 pub enum ChainEvmSubscription {
     /// claimed the subscription: subscription id
     Claimed(U256),
-    /// New plan: plan id, merchant, amount, period, tx
-    PlanStarted(U256, Address, U256, U256, B256),
+    /// New plan: plan id, merchant, amount, period
+    PlanStarted(U256, Address, U256, U256),
     /// Cancel plan: plan id
     PlanCanceled(U256),
-    /// New subscription: subscription id, plan id, customer, payer, token, nextTime, tx
-    SubscriptionStarted(U256, U256, Address, Address, Address, U256, B256),
+    /// New subscription: subscription id, plan id, customer, payer, token, nextTime
+    SubscriptionStarted(U256, U256, Address, Address, Address, U256),
     /// Cancel subscription: subscription id
     SubscriptionCanceled(U256),
 }
@@ -219,7 +219,9 @@ impl<S: ScannerStorage> ScannerService<S> {
                     }
                 },
                 Some(ScannerMessage::Subscription(index, msg)) => match msg {
-                    ChainSubscription::Evm(emsg) => self.handle_evm_subsctiption(index, emsg).await,
+                    ChainSubscription::Evm(emsg, tx) => {
+                        let _ = self.handle_evm_subscription(index, emsg, tx).await;
+                    }
                 },
                 Some(ScannerMessage::Scanned(index, block)) => {
                     let _ = self
@@ -294,12 +296,17 @@ impl<S: ScannerStorage> ScannerService<S> {
         Ok(())
     }
 
-    async fn handle_evm_subscription(&self, index: usize, msg: ChainEvmSubscription) -> Result<()> {
+    async fn handle_evm_subscription(
+        &self,
+        index: usize,
+        msg: ChainEvmSubscription,
+        tx: B256,
+    ) -> Result<()> {
         match msg {
             ChainEvmSubscription::Claimed(id) => {
                 //
             }
-            ChainEvmSubscription::PlanStarted(plan, merchant, amount, period, tx) => {
+            ChainEvmSubscription::PlanStarted(plan, merchant, amount, period) => {
                 //
             }
             ChainEvmSubscription::PlanCanceled(plan) => {
@@ -312,7 +319,6 @@ impl<S: ScannerStorage> ScannerService<S> {
                 payer,
                 token,
                 next_time,
-                tx,
             ) => {
                 //
             }
@@ -320,6 +326,8 @@ impl<S: ScannerStorage> ScannerService<S> {
                 //
             }
         }
+
+        Ok(())
     }
 }
 

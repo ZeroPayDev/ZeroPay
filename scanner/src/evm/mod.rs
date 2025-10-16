@@ -4,7 +4,7 @@ mod sub;
 pub use pay::transfer;
 pub use sub::claim;
 
-use crate::{Chain, ChainDeposit, ScannerMessage};
+use crate::{Chain, ChainDeposit, ChainEvmSubscription, ChainSubscription, ScannerMessage};
 use alloy::{
     primitives::{Address, B256, U256},
     providers::{Provider, ProviderBuilder},
@@ -52,15 +52,15 @@ impl Scanner {
         sender: UnboundedSender<ScannerMessage>,
     ) -> Result<Self> {
         let mut events = vec![EvmToken::Transfer::SIGNATURE_HASH];
-        let mut contracts = chain.tokens.keys().copied().collect();
+        let mut contracts: Vec<Address> = chain.tokens.keys().copied().collect();
 
         if let Some(s) = chain.subscription {
             events.extend([
-                EvmSubscription::PlanStarted,
-                EvmSubscription::PlanCanceled,
-                EvmSubscription::SubscriptionStarted,
-                EvmSubscription::SubscriptionCanceled,
-                EvmSubscription::SubscriptionClaimed,
+                EvmSubscription::PlanStarted::SIGNATURE_HASH,
+                EvmSubscription::PlanCanceled::SIGNATURE_HASH,
+                EvmSubscription::SubscriptionStarted::SIGNATURE_HASH,
+                EvmSubscription::SubscriptionCanceled::SIGNATURE_HASH,
+                EvmSubscription::SubscriptionClaimed::SIGNATURE_HASH,
             ]);
             contracts.push(s);
         }
@@ -112,8 +112,9 @@ impl Scanner {
 
     // Parse a log into a TransferEvent
     fn handle_event(&self, log: Log) -> Result<()> {
-        // ERC20 Transfer event signature: Transfer(address,address,uint256)
+        let tx = log.transaction_hash.unwrap_or(B256::ZERO);
 
+        // ERC20 Transfer event signature: Transfer(address,address,uint256)
         if let Ok(event) = EvmToken::Transfer::decode_log(&log.inner) {
             tracing::debug!(
                 "Fetch transfer: {}-{}:{}",
@@ -129,7 +130,7 @@ impl Scanner {
                     log.address(), // token address
                     event.to,
                     event.value,
-                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                    tx,
                 ),
             ));
 
@@ -139,15 +140,12 @@ impl Scanner {
         }
 
         if let Ok(event) = EvmSubscription::SubscriptionClaimed::decode_log(&log.inner) {
-            tracing::debug!("Fetch subscription claimed: {}-{}:{}", event.id);
+            tracing::debug!("Fetch subscription claimed: {}", event.id);
 
             // Send deposit message for processing
             let _ = self.sender.send(ScannerMessage::Subscription(
                 self.index,
-                ChainSubscription::Claimed(
-                    event.id,
-                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
-                ),
+                ChainSubscription::Evm(ChainEvmSubscription::Claimed(event.id), tx),
             ));
 
             return Ok(());
@@ -157,14 +155,16 @@ impl Scanner {
             tracing::debug!("Fetch plan started: {}:{}", event.id, event.merchant);
 
             // Send deposit message for processing
-            let _ = self.sender.send(ScannerMessage::Plan(
+            let _ = self.sender.send(ScannerMessage::Subscription(
                 self.index,
-                ChainPlan::PlanStarted(
-                    event.id,
-                    event.merchant,
-                    event.amount,
-                    event.period,
-                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ChainSubscription::Evm(
+                    ChainEvmSubscription::PlanStarted(
+                        event.id,
+                        event.merchant,
+                        event.amount,
+                        event.period,
+                    ),
+                    tx,
                 ),
             ));
 
@@ -175,12 +175,9 @@ impl Scanner {
             tracing::debug!("Fetch plan canceled: {}", event.id);
 
             // Send deposit message for processing
-            let _ = self.sender.send(ScannerMessage::Plan(
+            let _ = self.sender.send(ScannerMessage::Subscription(
                 self.index,
-                ChainPlan::PlanCanceled(
-                    event.id,
-                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
-                ),
+                ChainSubscription::Evm(ChainEvmSubscription::PlanCanceled(event.id), tx),
             ));
 
             return Ok(());
@@ -190,16 +187,18 @@ impl Scanner {
             tracing::debug!("Fetch subscription started: {}", event.id);
 
             // Send deposit message for processing
-            let _ = self.sender.send(ScannerMessage::Plan(
+            let _ = self.sender.send(ScannerMessage::Subscription(
                 self.index,
-                ChainPlan::SubscriptionStarted(
-                    event.id,
-                    event.plan,
-                    event.customer,
-                    event.payer,
-                    event.token,
-                    event.nextTime,
-                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
+                ChainSubscription::Evm(
+                    ChainEvmSubscription::SubscriptionStarted(
+                        event.id,
+                        event.plan,
+                        event.customer,
+                        event.payer,
+                        event.token,
+                        event.nextTime,
+                    ),
+                    tx,
                 ),
             ));
 
@@ -210,12 +209,9 @@ impl Scanner {
             tracing::debug!("Fetch subscription canceled: {}", event.id);
 
             // Send deposit message for processing
-            let _ = self.sender.send(ScannerMessage::Plan(
+            let _ = self.sender.send(ScannerMessage::Subscription(
                 self.index,
-                ChainPlan::SubscriptionCanceled(
-                    event.id,
-                    log.transaction_hash.unwrap_or(B256::ZERO), // tx hash
-                ),
+                ChainSubscription::Evm(ChainEvmSubscription::SubscriptionCanceled(event.id), tx),
             ));
 
             return Ok(());
