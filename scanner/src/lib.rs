@@ -33,7 +33,7 @@ pub struct ChainConfig {
     pub commission_min: i32,
     pub commission_max: i32,
     pub rpc: String,
-    pub admin: String,
+    pub admin: Option<String>,
     pub tokens: Vec<String>,
     pub subscription: Option<String>,
 }
@@ -136,10 +136,16 @@ pub struct ScannerService<S: ScannerStorage> {
 impl<S: ScannerStorage> ScannerService<S> {
     pub async fn new(storage: S, mnemonics: String, config: ScannerConfig) -> Result<Self> {
         // parse the chain configure
+        let (default_sk, _addr) = generate_eth(0, 0, &mnemonics)?;
+        let default_admin: PrivateKeySigner = default_sk.parse()?;
         let mut chains = vec![];
         for config in config.chains {
             let chain_type = ChainType::from_str(&config.chain_type);
-            let wallet: PrivateKeySigner = config.admin.parse()?;
+            let wallet: PrivateKeySigner = if let Some(admin) = config.admin {
+                admin.parse()?
+            } else {
+                default_admin.clone()
+            };
             let rpc: Url = config.rpc.parse()?;
             let provider = ProviderBuilder::new().connect_http(rpc.clone());
 
@@ -238,7 +244,7 @@ impl<S: ScannerStorage> ScannerService<S> {
         let cs = customer.to_checksum(None);
         let tx = format!("{:?}", tx);
         let (mid, cid, merchant) = self.storage.contains_address(&cs).await?;
-        let _ = self.storage.no_transaction(&tx).await?;
+        self.storage.no_transaction(&tx).await?;
         let merchant: Address = merchant.parse()?;
 
         // 2. save the new deposited

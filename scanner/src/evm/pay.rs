@@ -10,6 +10,7 @@ use alloy::{
 use anyhow::Result;
 
 // transfer token from deposit to admin, return real merchant amount
+#[allow(clippy::too_many_arguments)]
 pub async fn transfer(
     customer: Address,
     merchant: Address,

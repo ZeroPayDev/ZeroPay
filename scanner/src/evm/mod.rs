@@ -52,7 +52,7 @@ impl Scanner {
         sender: UnboundedSender<ScannerMessage>,
     ) -> Result<Self> {
         let mut events = vec![EvmToken::Transfer::SIGNATURE_HASH];
-        let mut contracts = chain.tokens.keys().map(|v| *v).collect();
+        let mut contracts = chain.tokens.keys().copied().collect();
 
         if let Some(s) = chain.subscription {
             events.extend([

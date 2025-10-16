@@ -31,7 +31,16 @@ impl Customer {
 
     /// get or insert the account by given account
     pub async fn get_or_insert(account: String, db: &PgPool, mem: &str) -> Result<Self> {
-        if let Ok(a) = Self::get_by_account(&account, db).await {
+        if let Ok(mut a) = Self::get_by_account(&account, db).await {
+            // check customer has pay account
+            if a.eth.is_empty() {
+                let (_, eth) = generate_eth(0, a.id, mem).map_err(|_err| ApiError::Internal)?;
+                a.eth = eth;
+                let _ = query!("UPDATE customers SET eth=$1 WHERE id=$2", a.eth, a.id)
+                    .execute(db)
+                    .await?;
+            }
+
             Ok(a)
         } else {
             let now = Utc::now().naive_utc();
