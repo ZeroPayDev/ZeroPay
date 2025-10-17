@@ -1,5 +1,5 @@
 [workspace]
-members = [ "scanner", "api"]
+members = [ "scanner", "api", "x402"]
 resolver = "2"
 
 [workspace.dependencies]
