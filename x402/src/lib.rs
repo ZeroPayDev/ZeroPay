@@ -1,5 +1,14 @@
+mod scheme;
+pub use scheme::evm::EvmScheme;
+pub use scheme::sol::SolScheme;
+
+mod client;
+
 use serde_json::Value;
 use std::collections::HashMap;
+
+pub const X402_VERSION: i32 = 1;
+pub const SCHEME: &'static str = "exact";
 
 /// When a resource server requires payment, it responds with a payment required signal and a JSON payload containing payment requirements
 pub struct PaymentRequirementsResponse {
@@ -73,20 +82,6 @@ pub struct Authorization {
     pub nonce: String,
 }
 
-/// After payment settlement, the server includes transaction details in the payment response field as JSON
-pub struct SettlementResponse {
-    /// Indicates whether the payment settlement was successful
-    pub success: bool,
-    /// Error reason if settlement failed (omitted if successful)
-    pub errorReason: Option<String>,
-    /// Blockchain transaction hash (empty string if settlement failed)
-    pub transaction: String,
-    ///	Blockchain network identifier
-    pub network: String,
-    /// Address of the payer's wallet
-    pub payer: String,
-}
-
 /// The request of verify and settle payment by scheme
 pub struct VerifyRequest {
     /// The payload information
@@ -105,54 +100,18 @@ pub struct VerifyResponse {
     invalidReason: Option<String>,
 }
 
-impl VerifyRequest {
-    /// The scheme of this payment request
-    fn scheme(&self) -> &str {
-        &self.paymentRequirements.scheme
-    }
-
-    /// The network of this payment request
-    fn network(&self) -> &str {
-        &self.paymentRequirements.network
-    }
-
-    /// The asset of this payment request
-    fn asset(&self) -> &str {
-        &self.paymentRequirements.asset
-    }
-
-    /// The payer of this payment request
-    fn payer(&self) -> &str {
-        &self.paymentPayload.payload.authorization.from
-    }
-
-    /// verify the request by scheme
-    pub fn verify(&self, registry: &PaymentSchemeRegistry) -> VerifyResponse {
-        if let Some(scheme) = registry.from_request(self) {
-            scheme.verify()
-        } else {
-            VerifyResponse {
-                isValid: false,
-                invalidReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
-                payer: self.payer().to_owned(),
-            }
-        }
-    }
-
-    /// settle the request by scheme
-    pub fn settle(&self, registry: &PaymentSchemeRegistry) -> SettlementResponse {
-        if let Some(scheme) = registry.from_request(self) {
-            scheme.settle()
-        } else {
-            SettlementResponse {
-                success: false,
-                errorReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
-                transaction: "".to_owned(),
-                network: self.network().to_owned(),
-                payer: self.payer().to_owned(),
-            }
-        }
-    }
+/// After payment settlement, the server includes transaction details in the payment response field as JSON
+pub struct SettlementResponse {
+    /// Indicates whether the payment settlement was successful
+    pub success: bool,
+    /// Error reason if settlement failed (omitted if successful)
+    pub errorReason: Option<String>,
+    /// Blockchain transaction hash (empty string if settlement failed)
+    pub transaction: String,
+    ///	Blockchain network identifier
+    pub network: String,
+    /// Address of the payer's wallet
+    pub payer: String,
 }
 
 /// List supported payment schemes.
@@ -317,34 +276,30 @@ impl Error {
     }
 }
 
+/// Main Payee type, support evm-based and solana-based
+#[derive(Clone)]
+pub struct Payee {
+    /// evm-based account
+    pub evm: Option<String>,
+    /// solana-based account
+    pub sol: Option<String>,
+}
+
+/// The payment scheme interface
 pub trait PaymentScheme: Sync {
     /// Get the scheme identifier, now we use scheme + network
-    fn identity() -> String
-    where
-        Self: Sized,
-    {
-        format!("{}-{}-{}", Self::scheme(), Self::network(), Self::asset())
+    fn identity(&self) -> String {
+        format!("{}-{}", self.scheme(), self.network())
     }
 
     /// The scheme of this payment scheme
-    fn scheme() -> &'static str
-    where
-        Self: Sized;
+    fn scheme(&self) -> &str;
 
     /// The network of this payment scheme
-    fn network() -> &'static str
-    where
-        Self: Sized;
+    fn network(&self) -> &str;
 
-    /// The asset of this payment scheme
-    fn asset() -> &'static str
-    where
-        Self: Sized;
-
-    /// Build new payment scheme by verify/settle request
-    fn from_request(req: &VerifyRequest) -> Self
-    where
-        Self: Sized;
+    /// Create a payment for the client
+    fn create(&self, price: f32, payee: Payee) -> Vec<PaymentRequirements>;
 
     /// The facilitator performs the following verification steps:
     /// 1. Signature Validation: Verify the EIP-712 signature is valid and properly signed by the payer
@@ -353,21 +308,21 @@ pub trait PaymentScheme: Sync {
     /// 4. Time Window Check: Verify the authorization is within its valid time range
     /// 5. Parameter Matching: Confirm authorization parameters match the original payment requirements
     /// 6. Transaction Simulation: Simulate the transferWithAuthorization transaction to ensure it would succeed
-    fn verify(&self) -> VerifyResponse;
+    fn verify(&self, req: &VerifyRequest) -> VerifyResponse;
 
     /// Settlement is performed by calling the transferWithAuthorization
     /// function on the ERC-20 contract with the signature and authorization
     /// parameters provided in the payment payload.
-    fn settle(&self) -> SettlementResponse;
+    fn settle(&self, req: &VerifyRequest) -> SettlementResponse;
 }
 
-/// The main registry for all payment scheme
-pub struct PaymentSchemeRegistry {
-    schemes: HashMap<String, fn(req: &VerifyRequest) -> Box<dyn PaymentScheme>>,
+/// The main facilitator for all payment scheme
+pub struct Facilitator {
+    schemes: HashMap<String, Box<dyn PaymentScheme>>,
 }
 
-impl PaymentSchemeRegistry {
-    /// Create new registry
+impl Facilitator {
+    /// Create new facilitator
     pub fn new() -> Self {
         Self {
             schemes: HashMap::new(),
@@ -375,18 +330,70 @@ impl PaymentSchemeRegistry {
     }
 
     /// Register new payment scheme to it
-    pub fn register<T: PaymentScheme + 'static>(&mut self)
-    where
-        T: Sync,
-    {
-        let identity = T::identity();
-        self.schemes
-            .insert(identity, |req| Box::new(T::from_request(req)));
+    pub fn register<T: PaymentScheme + 'static>(&mut self, scheme: T) {
+        let identity = scheme.identity();
+        self.schemes.insert(identity, Box::new(scheme));
     }
 
-    /// Create new payment scheme from verify/settle request
-    pub fn from_request(&self, req: &VerifyRequest) -> Option<Box<dyn PaymentScheme>> {
-        let identity = format!("{}-{}-{}", req.scheme(), req.network(), req.asset());
-        self.schemes.get(&identity).map(|f| f(req))
+    /// Create a payment for the client
+    pub fn create(&self, price: f32, payee: Payee) -> PaymentRequirementsResponse {
+        let mut payments = Vec::new();
+        for (_, scheme) in self.schemes.iter() {
+            payments.extend(scheme.create(price, payee.clone()));
+        }
+
+        PaymentRequirementsResponse {
+            x402Version: X402_VERSION.to_owned(),
+            error: "".to_owned(),
+            accepts: payments,
+        }
+    }
+
+    /// Verify the payment request
+    pub fn verify(&self, req: &VerifyRequest) -> VerifyResponse {
+        let identity = format!(
+            "{}-{}",
+            req.paymentPayload.scheme, req.paymentPayload.network
+        );
+        if let Some(scheme) = self.schemes.get(&identity) {
+            scheme.verify(req)
+        } else {
+            VerifyResponse {
+                isValid: false,
+                invalidReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
+                payer: req.paymentPayload.payload.authorization.from.clone(),
+            }
+        }
+    }
+
+    /// Settle the payment request
+    pub fn settle(&self, req: &VerifyRequest) -> SettlementResponse {
+        let identity = format!(
+            "{}-{}",
+            req.paymentPayload.scheme, req.paymentPayload.network
+        );
+        if let Some(scheme) = self.schemes.get(&identity) {
+            scheme.settle(req)
+        } else {
+            SettlementResponse {
+                success: false,
+                errorReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
+                transaction: "".to_owned(),
+                network: req.paymentPayload.network.clone(),
+                payer: req.paymentPayload.payload.authorization.from.clone(),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut registry = Facilitator::new();
+        registry.register(EvmScheme::new("https://x.com", "network").unwrap());
+        registry.register(SolScheme::new("rpc", "network").unwrap());
     }
 }
