@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 scanner.workspace = true
+x402.workspace = true
 anyhow.workspace = true
 axum.workspace = true
 chrono.workspace = true
