@@ -4,6 +4,7 @@ resolver = "2"
 
 [workspace.dependencies]
 scanner = { path = "scanner", version = "0.1" }
+x402 = { path = "x402", version = "0.1" }
 alloy = "1.0"
 anyhow = "1.0"
 async-trait = "0.1"

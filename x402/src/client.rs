@@ -34,6 +34,12 @@ pub struct ClientFacilitator {
     infos: HashMap<String, PaymentInfo>,
 }
 
+impl Default for ClientFacilitator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClientFacilitator {
     /// Create new facilitator
     pub fn new() -> Self {

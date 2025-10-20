@@ -1,12 +1,19 @@
 use crate::{
-    Error, Payee, PaymentRequirementsResponse, PaymentScheme,
-    SettlementResponse, VerifyRequest, VerifyResponse, X402_VERSION,
+    DiscoveryRequest, DiscoveryResponse, Error, Pagination, Payee, PaymentRequirementsResponse,
+    PaymentScheme, SettlementResponse, SupportedResponse, SupportedScheme, VerifyRequest,
+    VerifyResponse, X402_VERSION,
 };
 use std::collections::HashMap;
 
 /// The main facilitator for all payment scheme
 pub struct Facilitator {
     schemes: HashMap<String, Box<dyn PaymentScheme>>,
+}
+
+impl Default for Facilitator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Facilitator {
@@ -72,17 +79,34 @@ impl Facilitator {
             }
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{EvmScheme, SolScheme};
+    /// List the supported schemes
+    pub fn support(&self) -> SupportedResponse {
+        let mut kinds = vec![];
+        for (_, scheme) in self.schemes.iter() {
+            kinds.push(SupportedScheme {
+                x402_version: X402_VERSION.to_owned(),
+                scheme: scheme.scheme().to_owned(),
+                network: scheme.network().to_owned(),
+            });
+        }
+        SupportedResponse { kinds }
+    }
 
-    #[test]
-    fn test() {
-        let mut registry = Facilitator::new();
-        registry.register(EvmScheme::new("https://x.com", "network").unwrap());
-        registry.register(SolScheme::new("rpc", "network").unwrap());
+    /// List the discovery response
+    pub fn discovery(&self, req: DiscoveryRequest) -> DiscoveryResponse {
+        let pagination = Pagination {
+            limit: req.limit.unwrap_or(20),
+            offset: req.offset.unwrap_or(0),
+            total: 0,
+        };
+
+        let items = vec![]; // TODO build the resource
+
+        DiscoveryResponse {
+            x402_version: X402_VERSION.to_owned(),
+            items,
+            pagination,
+        }
     }
 }

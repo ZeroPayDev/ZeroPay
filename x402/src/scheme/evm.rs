@@ -21,6 +21,7 @@ pub use alloy::sol_types::Eip712Domain;
 
 sol!(
     #[allow(missing_docs)]
+    #[allow(clippy::too_many_arguments)]
     #[sol(rpc)]
     Eip3009Token,
     "EIP3009.json"

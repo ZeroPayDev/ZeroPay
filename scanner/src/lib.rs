@@ -7,7 +7,7 @@ pub use event::ScannerEvent;
 
 use alloy::{
     primitives::{Address, B256, U256},
-    providers::ProviderBuilder,
+    providers::{Provider, ProviderBuilder},
     signers::local::PrivateKeySigner,
     transports::http::reqwest::Url,
 };
@@ -63,7 +63,8 @@ pub trait ScannerStorage: Send + Sync + 'static {
     ) -> impl Future<Output = Result<()>> + Send;
 }
 
-enum ChainType {
+#[derive(Clone, Copy, Debug)]
+pub enum ChainType {
     Evm,
 }
 
@@ -79,15 +80,36 @@ impl ChainType {
 struct Chain {
     chain_type: ChainType,
     chain_name: String,
+    _chain_id: u64,
     latency: i64,
     commission: i32,
     commission_min: i32,
     commission_max: i32,
     rpc: Url,
     wallet: PrivateKeySigner,
-    tokens: HashMap<Address, String>,
-    decimals: HashMap<Address, u8>,
+    raw_wallet: String,
+    assets: HashMap<Address, ChainAsset>,
     last_scanned_block: i64,
+}
+
+/// Chain common asset type
+#[derive(Clone, Debug)]
+pub struct ChainAsset {
+    pub identity: String,
+    pub address: String,
+    pub name: String,
+    pub version: String,
+    pub decimal: u8,
+}
+
+/// filter the supported x402 protocol network and assets
+#[derive(Clone, Debug)]
+pub struct X402Asset {
+    pub ctype: ChainType,
+    pub rpc: String,
+    pub network: String,
+    pub signer: String,
+    pub assets: Vec<ChainAsset>,
 }
 
 pub enum ChainDeposit {
@@ -117,25 +139,34 @@ impl<S: ScannerStorage> ScannerService<S> {
         let mut chains = vec![];
         for config in config.chains {
             let chain_type = ChainType::from_str(&config.chain_type);
-            let wallet: PrivateKeySigner = if let Some(admin) = config.admin {
-                admin.parse()?
+            let (wallet, raw_wallet): (PrivateKeySigner, String) = if let Some(admin) = config.admin
+            {
+                (admin.parse()?, admin)
             } else {
-                default_admin.clone()
+                (default_admin.clone(), default_sk.clone())
             };
             let rpc: Url = config.rpc.parse()?;
             let provider = ProviderBuilder::new().connect_http(rpc.clone());
+            let chain_id = provider.get_chain_id().await?;
 
             // fetch token decimal and also test the rpc is work
-            let mut tokens = HashMap::new();
-            let mut decimals = HashMap::new();
+            let mut assets = HashMap::new();
             for t in config.tokens.iter() {
                 let mut values = t.split(":");
                 let name: String = values.next().unwrap_or_default().to_owned();
                 let token: Address = values.next().unwrap_or_default().parse()?;
+                let version = values.next().unwrap_or_default().to_owned();
                 let decimal = evm::get_token_decimal(token, provider.clone()).await?;
                 let identity = format!("{}:{}", config.chain_name, name);
-                tokens.insert(token, identity);
-                decimals.insert(token, decimal);
+
+                let asset = ChainAsset {
+                    identity,
+                    address: token.to_checksum(None),
+                    name,
+                    version,
+                    decimal,
+                };
+                assets.insert(token, asset);
             }
 
             let last_scanned_block = storage.get_scanned_block(&config.chain_name).await?;
@@ -143,14 +174,15 @@ impl<S: ScannerStorage> ScannerService<S> {
             chains.push(Chain {
                 chain_type,
                 chain_name: config.chain_name,
+                _chain_id: chain_id,
                 latency: config.latency as i64,
                 commission: config.commission,
                 commission_min: config.commission_min,
                 commission_max: config.commission_max,
                 rpc,
                 wallet,
-                tokens,
-                decimals,
+                raw_wallet,
+                assets,
                 last_scanned_block,
             });
         }
@@ -162,10 +194,11 @@ impl<S: ScannerStorage> ScannerService<S> {
         })
     }
 
-    pub async fn run(self) -> Result<UnboundedSender<ScannerMessage>> {
+    pub async fn run(self) -> Result<(UnboundedSender<ScannerMessage>, Vec<X402Asset>)> {
         let (sender, receiver) = unbounded_channel::<ScannerMessage>();
 
         // start chain scanners
+        let mut x402_assets = vec![];
         for (i, chain) in self.chains.iter().enumerate() {
             match chain.chain_type {
                 ChainType::Evm => evm::Scanner::new(i, chain, sender.clone()).await?.run(),
@@ -174,12 +207,27 @@ impl<S: ScannerStorage> ScannerService<S> {
                 "{} scanning, main account: {}, tokens: {:?}",
                 chain.chain_name,
                 chain.wallet.address(),
-                chain.tokens,
+                chain.assets.keys(),
             );
+            let mut assets = vec![];
+            for asset in chain.assets.values() {
+                if !asset.version.is_empty() {
+                    assets.push(asset.clone());
+                }
+            }
+            if !assets.is_empty() {
+                x402_assets.push(X402Asset {
+                    ctype: chain.chain_type,
+                    rpc: chain.rpc.to_string(),
+                    network: chain.chain_name.clone(),
+                    signer: chain.raw_wallet.clone(),
+                    assets,
+                })
+            }
         }
 
         tokio::spawn(self.listen(receiver));
-        Ok(sender)
+        Ok((sender, x402_assets))
     }
 
     async fn listen(self, mut recv: UnboundedReceiver<ScannerMessage>) {
@@ -220,16 +268,14 @@ impl<S: ScannerStorage> ScannerService<S> {
 
         // 2. save the new deposited
         let chain = &self.chains[index];
-        let decimal = chain.decimals.get(&token).unwrap_or(&6);
-        let identity = chain
-            .tokens
+        let asset = chain
+            .assets
             .get(&token)
-            .cloned()
-            .unwrap_or(chain.chain_name.clone());
-        let amount = evm::u256_to_i32(value, decimal);
+            .ok_or(anyhow::anyhow!("No token"))?;
+        let amount = evm::u256_to_i32(value, &asset.decimal);
         let did = self
             .storage
-            .deposited(identity.clone(), mid, cid, amount, tx.clone())
+            .deposited(asset.identity.clone(), mid, cid, amount, tx.clone())
             .await?;
 
         // 2. generate customer secret key
@@ -245,8 +291,8 @@ impl<S: ScannerStorage> ScannerService<S> {
             chain.wallet.clone(),
             chain.rpc.clone(),
             chain.commission,
-            evm::i32_to_u256(chain.commission_min, decimal),
-            evm::i32_to_u256(chain.commission_max, decimal),
+            evm::i32_to_u256(chain.commission_min, &asset.decimal),
+            evm::i32_to_u256(chain.commission_max, &asset.decimal),
         )
         .await
         .map_err(|err| {
@@ -255,11 +301,11 @@ impl<S: ScannerStorage> ScannerService<S> {
         })?;
 
         // 4. save the settled to deposit
-        let settled_amount = evm::u256_to_i32(settled_amount, decimal);
+        let settled_amount = evm::u256_to_i32(settled_amount, &asset.decimal);
         let settled_tx = format!("{:?}", settled_tx);
         let _ = self
             .storage
-            .settled(identity, did, settled_amount, settled_tx)
+            .settled(asset.identity.clone(), did, settled_amount, settled_tx)
             .await;
 
         Ok(())

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const X402_VERSION: i32 = 1;
-pub const SCHEME: &'static str = "exact";
+pub const SCHEME: &str = "exact";
 
 /// When a resource server requires payment, it responds with a payment required signal and a JSON payload containing payment requirements
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +117,19 @@ pub struct VerifyResponse {
     pub invalid_reason: Option<String>,
 }
 
+impl VerifyResponse {
+    /// convert verify response to settle
+    pub fn to_settle(self, network: &str, tx: &str) -> SettlementResponse {
+        SettlementResponse {
+            success: self.is_valid,
+            error_reason: self.invalid_reason,
+            transaction: tx.to_owned(),
+            network: network.to_owned(),
+            payer: self.payer,
+        }
+    }
+}
+
 /// After payment settlement, the server includes transaction details in the payment response field as JSON
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,7 +140,7 @@ pub struct SettlementResponse {
     pub error_reason: Option<String>,
     /// Blockchain transaction hash (empty string if settlement failed)
     pub transaction: String,
-    ///	Blockchain network identifier
+    /// Blockchain network identifier
     pub network: String,
     /// Address of the payer's wallet
     pub payer: String,

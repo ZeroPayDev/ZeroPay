@@ -16,7 +16,7 @@ use axum::{
 use clap::Parser;
 use models::Storage;
 use redis::Client as RedisClient;
-use scanner::{ScannerConfig, ScannerMessage, ScannerService};
+use scanner::{ChainType, ScannerConfig, ScannerMessage, ScannerService};
 use sqlx::{
     any::Any as SqlxAny,
     migrate::MigrateDatabase,
@@ -26,6 +26,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::level_filters::LevelFilter;
+use x402::{EvmScheme, Facilitator};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -69,6 +70,7 @@ struct AppState {
     redis: RedisClient,
     mnemonics: String,
     apikey: String,
+    facilitator: Arc<Facilitator>,
     _sender: UnboundedSender<ScannerMessage>,
 }
 
@@ -125,17 +127,36 @@ async fn main() {
         webhook: args.webhook,
         wallet: args.wallet,
     };
-    let _sender = ScannerService::new(storage, args.mnemonics.clone(), scanner_config)
-        .await
-        .unwrap()
-        .run()
-        .await
-        .unwrap();
+    let (_sender, x402_assets) =
+        ScannerService::new(storage, args.mnemonics.clone(), scanner_config)
+            .await
+            .unwrap()
+            .run()
+            .await
+            .unwrap();
+
+    // building x402 facilitator
+    let mut facilitator = Facilitator::new();
+    for c in x402_assets {
+        match c.ctype {
+            ChainType::Evm => {
+                let mut scheme = EvmScheme::new(&c.rpc, &c.network, &c.signer).unwrap();
+                for asset in c.assets {
+                    scheme
+                        .asset(&asset.address, &asset.name, &asset.version)
+                        .await
+                        .unwrap();
+                }
+                facilitator.register(scheme);
+            }
+        }
+    }
 
     let app_state = Arc::new(AppState {
         _sender,
         db,
         redis,
+        facilitator: Arc::new(facilitator),
         apikey: args.apikey,
         mnemonics: args.mnemonics,
     });
@@ -148,6 +169,10 @@ async fn main() {
     let router = Router::new()
         .route("/sessions", post(api::create_session))
         .route("/sessions/{id}", get(api::get_session))
+        .route("/x402/requirements", get(api::x402_requirements))
+        .route("/x402/payments", post(api::x402_payment))
+        .route("/x402/support", get(api::x402_support))
+        .route("/x402/discovery", get(api::x402_discovery))
         .with_state(app_state)
         .layer(cors);
 
