@@ -3,11 +3,12 @@ pub use scheme::evm::EvmScheme;
 pub use scheme::sol::SolScheme;
 
 pub mod client;
+pub mod facilitator;
+pub use facilitator::Facilitator;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 
 pub const X402_VERSION: i32 = 1;
 pub const SCHEME: &'static str = "exact";
@@ -368,86 +369,4 @@ pub trait PaymentScheme: Send + Sync {
     /// function on the ERC-20 contract with the signature and authorization
     /// parameters provided in the payment payload.
     async fn settle(&self, req: &VerifyRequest) -> SettlementResponse;
-}
-
-/// The main facilitator for all payment scheme
-pub struct Facilitator {
-    schemes: HashMap<String, Box<dyn PaymentScheme>>,
-}
-
-impl Facilitator {
-    /// Create new facilitator
-    pub fn new() -> Self {
-        Self {
-            schemes: HashMap::new(),
-        }
-    }
-
-    /// Register new payment scheme to it
-    pub fn register<T: PaymentScheme + 'static>(&mut self, scheme: T) {
-        let identity = scheme.identity();
-        self.schemes.insert(identity, Box::new(scheme));
-    }
-
-    /// Create a payment for the client
-    pub fn create(&self, price: &str, payee: Payee) -> PaymentRequirementsResponse {
-        let mut payments = Vec::new();
-        for (_, scheme) in self.schemes.iter() {
-            payments.extend(scheme.create(price, payee.clone()));
-        }
-
-        PaymentRequirementsResponse {
-            x402_version: X402_VERSION.to_owned(),
-            error: "".to_owned(),
-            accepts: payments,
-        }
-    }
-
-    /// Verify the payment request
-    pub async fn verify(&self, req: &VerifyRequest) -> VerifyResponse {
-        let identity = format!(
-            "{}-{}",
-            req.payment_payload.scheme, req.payment_payload.network
-        );
-        if let Some(scheme) = self.schemes.get(&identity) {
-            scheme.verify(req).await
-        } else {
-            VerifyResponse {
-                is_valid: false,
-                invalid_reason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
-                payer: req.payment_payload.payload.authorization.from.clone(),
-            }
-        }
-    }
-
-    /// Settle the payment request
-    pub async fn settle(&self, req: &VerifyRequest) -> SettlementResponse {
-        let identity = format!(
-            "{}-{}",
-            req.payment_payload.scheme, req.payment_payload.network
-        );
-        if let Some(scheme) = self.schemes.get(&identity) {
-            scheme.settle(req).await
-        } else {
-            SettlementResponse {
-                success: false,
-                error_reason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
-                transaction: "".to_owned(),
-                network: req.payment_payload.network.clone(),
-                payer: req.payment_payload.payload.authorization.from.clone(),
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test() {
-        let mut registry = Facilitator::new();
-        registry.register(EvmScheme::new("https://x.com", "network").unwrap());
-        registry.register(SolScheme::new("rpc", "network").unwrap());
-    }
 }
