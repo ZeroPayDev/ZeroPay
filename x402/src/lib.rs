@@ -2,8 +2,10 @@ mod scheme;
 pub use scheme::evm::EvmScheme;
 pub use scheme::sol::SolScheme;
 
-mod client;
+pub mod client;
 
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -11,9 +13,11 @@ pub const X402_VERSION: i32 = 1;
 pub const SCHEME: &'static str = "exact";
 
 /// When a resource server requires payment, it responds with a payment required signal and a JSON payload containing payment requirements
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentRequirementsResponse {
     /// Protocol version identifier
-    pub x402Version: i32,
+    pub x402_version: i32,
     /// Human-readable error message explaining why payment is required
     pub error: String,
     /// Array of payment requirement objects defining acceptable payment methods
@@ -21,35 +25,39 @@ pub struct PaymentRequirementsResponse {
 }
 
 /// Payment requirement objects defining acceptable payment methods
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentRequirements {
     /// Payment scheme identifier (e.g., "exact")
     pub scheme: String,
     /// Blockchain network identifier (e.g., "base-sepolia", "ethereum-mainnet")
     pub network: String,
     /// Required payment amount in atomic token units
-    pub maxAmountRequired: String,
+    pub max_amount_required: String,
     /// Token contract address
     pub asset: String,
     /// Recipient wallet address for the payment
-    pub payTo: String,
+    pub pay_to: String,
     /// URL of the protected resource
     pub resource: String,
     /// Human-readable description of the resource
     pub description: String,
     /// MIME type of the expected response
-    pub mimeType: Option<String>,
+    pub mime_type: Option<String>,
     /// JSON schema describing the response format
-    pub outputSchema: Option<Value>,
+    pub output_schema: Option<Value>,
     /// Maximum time allowed for payment completion
-    pub maxTimeoutSeconds: i32,
+    pub max_timeout_seconds: i32,
     /// Scheme-specific additional information
     pub extra: Option<Value>,
 }
 
 /// The client includes payment authorization as JSON in the payment payload field
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentPayload {
     /// Protocol version identifier (must be 1)
-    pub x402Version: i32,
+    pub x402_version: i32,
     /// Payment scheme identifier (e.g., "exact")
     pub scheme: String,
     /// Blockchain network identifier (e.g., "base-sepolia", "ethereum-mainnet")
@@ -59,6 +67,8 @@ pub struct PaymentPayload {
 }
 
 /// Payment authorization scheme-specific data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SchemePayload {
     /// EIP-712 signature for authorization
     pub signature: String,
@@ -67,6 +77,8 @@ pub struct SchemePayload {
 }
 
 /// EIP-3009 authorization parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Authorization {
     /// Payer's wallet address
     pub from: String,
@@ -75,37 +87,43 @@ pub struct Authorization {
     /// Payment amount in atomic units
     pub value: String,
     /// Unix timestamp when authorization becomes valid
-    pub validAfter: String,
+    pub valid_after: String,
     /// Unix timestamp when authorization expires
-    pub validBefore: String,
+    pub valid_before: String,
     /// 32-byte random nonce to prevent replay attacks
     pub nonce: String,
 }
 
 /// The request of verify and settle payment by scheme
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VerifyRequest {
     /// The payload information
-    pub paymentPayload: PaymentPayload,
+    pub payment_payload: PaymentPayload,
     /// The payment requirement
-    pub paymentRequirements: PaymentRequirements,
+    pub payment_requirements: PaymentRequirements,
 }
 
 /// The response of verify payment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VerifyResponse {
     /// Whether the payment verify was successful
-    isValid: bool,
+    pub is_valid: bool,
     /// Address of the payer's wallet
-    payer: String,
+    pub payer: String,
     /// Error reason if verify failed (omitted if successful)
-    invalidReason: Option<String>,
+    pub invalid_reason: Option<String>,
 }
 
 /// After payment settlement, the server includes transaction details in the payment response field as JSON
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettlementResponse {
     /// Indicates whether the payment settlement was successful
     pub success: bool,
     /// Error reason if settlement failed (omitted if successful)
-    pub errorReason: Option<String>,
+    pub error_reason: Option<String>,
     /// Blockchain transaction hash (empty string if settlement failed)
     pub transaction: String,
     ///	Blockchain network identifier
@@ -115,65 +133,79 @@ pub struct SettlementResponse {
 }
 
 /// List supported payment schemes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SupportedResponse {
     /// The items of the schemes
-    kinds: Vec<SupportedScheme>,
+    pub kinds: Vec<SupportedScheme>,
 }
 
 /// The supported scheme
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SupportedScheme {
     /// Protocol version supported by the resource
-    x402Version: i32,
+    pub x402_version: i32,
     /// Payment scheme identifier (e.g., "exact")
-    scheme: String,
+    pub scheme: String,
     /// Blockchain network identifier (e.g., "base-sepolia", "ethereum-mainnet")
-    network: String,
+    pub network: String,
 }
 
 /// List discoverable x402 resources from the Bazaar.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveryRequest {
     /// Filter by resource type (e.g., "http"), default is none
-    r#type: Option<String>,
+    #[serde(rename = "type")]
+    pub r#type: Option<String>,
     /// Maximum number of results to return (1-100), default is 20
-    limit: Option<i32>,
+    pub limit: Option<i32>,
     /// Number of results to skip for pagination, default is 0
-    offset: Option<i32>,
+    pub offset: Option<i32>,
 }
 
 /// The response of discoverable resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveryResponse {
     /// Protocol version supported by the resource
-    x402Version: i32,
+    pub x402_version: i32,
     /// The list of supported resources item
-    items: Vec<DiscoveryItem>,
+    pub items: Vec<DiscoveryItem>,
     /// Pagination
-    pagination: Pagination,
+    pub pagination: Pagination,
 }
 
 /// Discoverable resources item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscoveryItem {
     /// The resource URL or identifier being monetized
-    resource: String,
+    pub resource: String,
     /// Resource type (currently "http" for HTTP endpoints)
-    r#type: String,
+    #[serde(rename = "type")]
+    pub r#type: String,
     /// Protocol version supported by the resource
-    x402Version: i32,
+    pub x402_version: i32,
     /// Array of PaymentRequirements objects specifying payment methods
-    accepts: Vec<PaymentRequirements>,
+    pub accepts: Vec<PaymentRequirements>,
     /// Unix timestamp of when the resource was last updated
-    lastUpdated: i64,
+    pub last_updated: i64,
     /// Additional metadata (category, provider, etc.)
-    metadata: Option<Value>,
+    pub metadata: Option<Value>,
 }
 
 /// Pagination for discovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Pagination {
     /// The number of items in a response
-    limit: i32,
+    pub limit: i32,
     /// The start point of this query
-    offset: i32,
+    pub offset: i32,
     /// The total number of all items
-    total: i32,
+    pub total: i32,
 }
 
 /// The error
@@ -274,10 +306,31 @@ impl Error {
             ),
         }
     }
+
+    /// Helper build a verify error
+    pub fn verify(&self, req: &PaymentPayload) -> VerifyResponse {
+        VerifyResponse {
+            is_valid: false,
+            payer: req.payload.authorization.from.clone(),
+            invalid_reason: Some(self.to_code().0.to_owned()),
+        }
+    }
+
+    /// Helper build a settle error
+    pub fn settle(&self, req: &PaymentPayload) -> SettlementResponse {
+        SettlementResponse {
+            success: false,
+            error_reason: Some(self.to_code().0.to_owned()),
+            transaction: "".to_owned(),
+            network: req.network.clone(),
+            payer: req.payload.authorization.from.clone(),
+        }
+    }
 }
 
 /// Main Payee type, support evm-based and solana-based
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Payee {
     /// evm-based account
     pub evm: Option<String>,
@@ -286,7 +339,8 @@ pub struct Payee {
 }
 
 /// The payment scheme interface
-pub trait PaymentScheme: Sync {
+#[async_trait]
+pub trait PaymentScheme: Send + Sync {
     /// Get the scheme identifier, now we use scheme + network
     fn identity(&self) -> String {
         format!("{}-{}", self.scheme(), self.network())
@@ -299,7 +353,7 @@ pub trait PaymentScheme: Sync {
     fn network(&self) -> &str;
 
     /// Create a payment for the client
-    fn create(&self, price: f32, payee: Payee) -> Vec<PaymentRequirements>;
+    fn create(&self, price: &str, payee: Payee) -> Vec<PaymentRequirements>;
 
     /// The facilitator performs the following verification steps:
     /// 1. Signature Validation: Verify the EIP-712 signature is valid and properly signed by the payer
@@ -308,12 +362,12 @@ pub trait PaymentScheme: Sync {
     /// 4. Time Window Check: Verify the authorization is within its valid time range
     /// 5. Parameter Matching: Confirm authorization parameters match the original payment requirements
     /// 6. Transaction Simulation: Simulate the transferWithAuthorization transaction to ensure it would succeed
-    fn verify(&self, req: &VerifyRequest) -> VerifyResponse;
+    async fn verify(&self, req: &VerifyRequest) -> VerifyResponse;
 
     /// Settlement is performed by calling the transferWithAuthorization
     /// function on the ERC-20 contract with the signature and authorization
     /// parameters provided in the payment payload.
-    fn settle(&self, req: &VerifyRequest) -> SettlementResponse;
+    async fn settle(&self, req: &VerifyRequest) -> SettlementResponse;
 }
 
 /// The main facilitator for all payment scheme
@@ -336,51 +390,51 @@ impl Facilitator {
     }
 
     /// Create a payment for the client
-    pub fn create(&self, price: f32, payee: Payee) -> PaymentRequirementsResponse {
+    pub fn create(&self, price: &str, payee: Payee) -> PaymentRequirementsResponse {
         let mut payments = Vec::new();
         for (_, scheme) in self.schemes.iter() {
             payments.extend(scheme.create(price, payee.clone()));
         }
 
         PaymentRequirementsResponse {
-            x402Version: X402_VERSION.to_owned(),
+            x402_version: X402_VERSION.to_owned(),
             error: "".to_owned(),
             accepts: payments,
         }
     }
 
     /// Verify the payment request
-    pub fn verify(&self, req: &VerifyRequest) -> VerifyResponse {
+    pub async fn verify(&self, req: &VerifyRequest) -> VerifyResponse {
         let identity = format!(
             "{}-{}",
-            req.paymentPayload.scheme, req.paymentPayload.network
+            req.payment_payload.scheme, req.payment_payload.network
         );
         if let Some(scheme) = self.schemes.get(&identity) {
-            scheme.verify(req)
+            scheme.verify(req).await
         } else {
             VerifyResponse {
-                isValid: false,
-                invalidReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
-                payer: req.paymentPayload.payload.authorization.from.clone(),
+                is_valid: false,
+                invalid_reason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
+                payer: req.payment_payload.payload.authorization.from.clone(),
             }
         }
     }
 
     /// Settle the payment request
-    pub fn settle(&self, req: &VerifyRequest) -> SettlementResponse {
+    pub async fn settle(&self, req: &VerifyRequest) -> SettlementResponse {
         let identity = format!(
             "{}-{}",
-            req.paymentPayload.scheme, req.paymentPayload.network
+            req.payment_payload.scheme, req.payment_payload.network
         );
         if let Some(scheme) = self.schemes.get(&identity) {
-            scheme.settle(req)
+            scheme.settle(req).await
         } else {
             SettlementResponse {
                 success: false,
-                errorReason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
+                error_reason: Some(Error::UnsupportedScheme.to_code().0.to_owned()),
                 transaction: "".to_owned(),
-                network: req.paymentPayload.network.clone(),
-                payer: req.paymentPayload.payload.authorization.from.clone(),
+                network: req.payment_payload.network.clone(),
+                payer: req.payment_payload.payload.authorization.from.clone(),
             }
         }
     }

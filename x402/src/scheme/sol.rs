@@ -3,8 +3,9 @@ use crate::{
     VerifyResponse,
 };
 use anyhow::Result;
-use std::collections::HashMap;
+use async_trait::async_trait;
 
+#[allow(dead_code)]
 pub struct SolScheme {
     scheme: String,
     network: String,
@@ -20,11 +21,12 @@ impl SolScheme {
         })
     }
 
-    pub async fn asset(&mut self, addr: &str) -> Result<()> {
+    pub async fn asset(&mut self, _addr: &str) -> Result<()> {
         todo!()
     }
 }
 
+#[async_trait]
 impl PaymentScheme for SolScheme {
     /// The scheme of this payment scheme
     fn scheme(&self) -> &str {
@@ -37,7 +39,7 @@ impl PaymentScheme for SolScheme {
     }
 
     /// Create a payment for the client
-    fn create(&self, price: f32, payee: Payee) -> Vec<PaymentRequirements> {
+    fn create(&self, _price: &str, _payee: Payee) -> Vec<PaymentRequirements> {
         todo!()
     }
 
@@ -48,14 +50,14 @@ impl PaymentScheme for SolScheme {
     /// 4. Time Window Check: Verify the authorization is within its valid time range
     /// 5. Parameter Matching: Confirm authorization parameters match the original payment requirements
     /// 6. Transaction Simulation: Simulate the transferWithAuthorization transaction to ensure it would succeed
-    fn verify(&self, req: &VerifyRequest) -> VerifyResponse {
+    async fn verify(&self, _req: &VerifyRequest) -> VerifyResponse {
         todo!()
     }
 
     /// Settlement is performed by calling the transferWithAuthorization
     /// function on the ERC-20 contract with the signature and authorization
     /// parameters provided in the payment payload.
-    fn settle(&self, req: &VerifyRequest) -> SettlementResponse {
+    async fn settle(&self, _req: &VerifyRequest) -> SettlementResponse {
         todo!()
     }
 }
