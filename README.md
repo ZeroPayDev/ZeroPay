@@ -18,6 +18,8 @@ An open-source, self-hosted payment gateway for stablecoins and cryptocurrency p
 
 ZeroPay is a lightweight, self-hosted payment gateway that enables merchants to accept stablecoin and cryptocurrency payments with minimal setup. Built with Rust for performance and reliability, it supports multiple EVM-compatible blockchains and provides real-time webhook notifications for payment events.
 
+**New in v1.x:** ZeroPay now supports the **x402 Agent-to-Agent (A2A) payment protocol**, enabling AI agents and autonomous systems to programmatically discover, authorize, and settle payments using EIP-3009 gasless transfers.
+
 ### Key Features
 
 - **Self-Hosted**: Full control over your payment infrastructure
@@ -25,7 +27,8 @@ ZeroPay is a lightweight, self-hosted payment gateway that enables merchants to 
 - **Stablecoin Focused**: Built for USDT, USDC, and other stablecoins
 - **Real-Time Notifications**: Webhook integration for payment events
 - **Automatic Settlement**: Funds automatically transferred to your wallet (minus commission)
-- **Secure**: HMAC-based webhook authentication
+- **x402 Protocol Support**: Agent-to-Agent (A2A) payment protocol for AI-powered integrations
+- **Secure**: HMAC-based webhook authentication and EIP-712 signatures
 - **Easy Integration**: RESTful API with comprehensive documentation
 - **Docker Ready**: One-command deployment with Docker
 
@@ -85,6 +88,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
 
 - **[Deployment Guide](./DEPLOYMENT.md)** - Complete setup instructions for Docker and source builds
 - **[API Reference](./API.md)** - REST API endpoints and webhook events
+- **[AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)** - x402 A2A protocol implementation guide for AI agents
 - **[Configuration Guide](#configuration)** - Environment and chain configuration
 
 ## Managed Platform
@@ -108,31 +112,32 @@ For a hassle-free experience, use our managed platform at [zeropay.dev](https://
 ## Architecture
 
 ```
-┌─────────────┐
-│   Client    │
-│ Application │
-└──────┬──────┘
-       │ REST API
-       ▼
-┌─────────────┐
-│   ZeroPay   │◄──────┐
-│   API       │       │
-└──────┬──────┘       │
-       │              │
-       ├──────────────┤
-       │              │
-       ▼              ▼
-┌──────────┐   ┌──────────┐
-│PostgreSQL│   │  Redis   │
-└──────────┘   └──────────┘
+┌─────────────┐         ┌─────────────┐
+│   Client    │         │  AI Agent   │
+│ Application │         │  (x402)     │
+└──────┬──────┘         └──────┬──────┘
+       │ REST API              │ x402 Protocol
+       │                       │ (EIP-3009)
+       ▼                       ▼
+┌──────────────────────────────────┐
+│         ZeroPay API              │
+│  /sessions     /x402/*           │◄──────┐
+└──────┬───────────────────────────┘       │
+       │                                   │
+       ├───────────────────────────────────┤
+       │                                   │
+       ▼                                   ▼
+┌──────────┐                        ┌──────────┐
+│PostgreSQL│                        │  Redis   │
+└──────────┘                        └──────────┘
        │
-       │ Scanner
+       │ Scanner + x402 Facilitator
        ▼
-┌─────────────────┐
-│   Blockchain    │
-│   (Ethereum,    │
-│   Polygon, etc) │
-└─────────────────┘
+┌─────────────────────────────────────┐
+│         Blockchain                  │
+│  (Ethereum, Polygon, Base, etc)     │
+│  EIP-3009 transferWithAuthorization │
+└─────────────────────────────────────┘
 ```
 
 ## Features
@@ -142,11 +147,29 @@ For a hassle-free experience, use our managed platform at [zeropay.dev](https://
 - Support for multiple stablecoins (USDT, USDC, DAI, etc.)
 - Automatic payment detection and confirmation
 - Configurable confirmation blocks for security
+- Support for both traditional and x402 A2A payment flows
+
+### x402 Agent-to-Agent (A2A) Protocol
+ZeroPay implements the x402 protocol, enabling AI agents and autonomous systems to interact with payment APIs programmatically:
+
+- **Payment Requirements Discovery**: AI agents can query payment requirements and supported methods
+- **EIP-3009 Authorization**: Gasless payment authorization using EIP-712 signatures
+- **Automatic Verification**: Signature validation, balance checks, and transaction simulation
+- **Instant Settlement**: Execute payments via `transferWithAuthorization` for immediate settlement
+- **Resource Discovery**: Browse and discover available payment-enabled services
+
+**x402 API Endpoints:**
+- `GET /x402/requirements` - Get payment requirements for a resource
+- `POST /x402/payments` - Submit payment authorization and settle
+- `GET /x402/support` - List supported payment schemes and networks
+- `GET /x402/discovery` - Discover available payment-enabled resources
+
+See the [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md) for complete x402 implementation details.
 
 ### Blockchain Support
 - **EVM-Compatible Chains**: Ethereum, Polygon, BSC, Arbitrum, Optimism, Avalanche, etc.
 - **Extensible**: Easy to add new chains via configuration
-- **Multi-Token**: Support any ERC-20 token
+- **Multi-Token**: Support any ERC-20 token with EIP-3009 support
 
 ### Webhook Events
 - `session.paid` - Customer completed payment
@@ -156,6 +179,7 @@ For a hassle-free experience, use our managed platform at [zeropay.dev](https://
 
 ### Security
 - HMAC-SHA256 webhook signatures
+- EIP-712 signature verification for x402 payments
 - API key authentication
 - HD wallet derivation for payment addresses
 - Configurable confirmation requirements
@@ -206,7 +230,9 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete configuration details.
 
 ## API Usage
 
-### Create Payment Session
+### Traditional Payment Flow
+
+Create a payment session and receive a unique deposit address:
 
 ```bash
 curl -X POST "http://localhost:9000/sessions?apikey=your-api-key" \
@@ -217,13 +243,99 @@ curl -X POST "http://localhost:9000/sessions?apikey=your-api-key" \
   }'
 ```
 
-### Check Payment Status
+Check payment status:
 
 ```bash
 curl "http://localhost:9000/sessions/12345?apikey=your-api-key"
 ```
 
-See [API.md](./API.md) for complete API documentation.
+### x402 A2A Payment Flow
+
+Query payment requirements for AI agents:
+
+```bash
+curl -X POST "http://localhost:9000/x402/requirements?apikey=your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": "agent_alice",
+    "amount": 1000
+  }'
+```
+
+Submit payment authorization and settle:
+
+```bash
+curl -X POST "http://localhost:9000/x402/payments?apikey=your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_payload": {
+      "x402_version": 1,
+      "scheme": "exact",
+      "network": "base-sepolia",
+      "payload": {
+        "signature": "0x...",
+        "authorization": {
+          "from": "0x...",
+          "to": "0x...",
+          "value": "1000000",
+          "validAfter": "0",
+          "validBefore": "1735689600",
+          "nonce": "0x..."
+        }
+      }
+    },
+    "payment_requirements": {...}
+  }'
+```
+
+See [API.md](./API.md) for complete traditional API documentation and [AI_INTEGRATION_GUIDE.md](./docs/AI_INTEGRATION_GUIDE.md) for x402 protocol details.
+
+## x402 Protocol Integration
+
+The x402 protocol enables autonomous AI agents to interact with ZeroPay for programmatic payments. Key capabilities:
+
+### How It Works
+
+1. **Discovery**: AI agents query `/x402/requirements` to get payment requirements
+2. **Authorization**: Agent creates an EIP-712 signature authorizing the payment
+3. **Settlement**: ZeroPay verifies the signature and settles via `transferWithAuthorization`
+4. **Response**: Agent receives transaction hash and settlement confirmation
+
+### Key Benefits
+
+- **Gasless Payments**: Payee covers gas fees, not the payer
+- **Instant Settlement**: No waiting for blockchain confirmations
+- **Secure**: EIP-712 signatures with time-bound authorization
+- **Discoverable**: Agents can browse available services via `/x402/discovery`
+
+### Supported Payment Schemes
+
+- **exact**: EIP-3009 exact transfer authorization
+- **Networks**: Base, Ethereum, Polygon, and other EVM chains
+- **Tokens**: USDC and other EIP-3009 compatible tokens
+
+### Client SDKs
+
+For AI agent developers, use the ZeroPay x402 client SDK:
+
+```rust
+use x402::client::{ClientFacilitator, PaymentMethod};
+
+// Initialize client with wallet
+let facilitator = ClientFacilitator::new();
+facilitator.add_payment_method(
+    "base-sepolia",
+    PaymentMethod::Evm(signer, rpc_url, tokens)
+);
+
+// Create payment payload
+let payload = facilitator.create_payment(&requirements).await?;
+
+// Submit payment
+let response = facilitator.pay(&url, payload).await?;
+```
+
+See the complete [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md) for implementation details.
 
 ## Development
 
@@ -281,7 +393,8 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Support
 
-- **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md)
+- **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md) | [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)
+- **x402 Protocol**: [API Documentation](./docs/API_DOCUMENTATION.md) | [Specification](https://github.com/zeropaydev/x402)
 - **Issues**: [GitHub Issues](https://github.com/ZeroPayDev/zeropay/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/ZeroPayDev/zeropay/discussions)
 - **Platform Support**: hi@zeropay.dev
