@@ -296,14 +296,14 @@ Triggered when funds (minus commission) are transferred to your merchant account
 
 ---
 
-#### unknow.paid
+#### unknown.paid
 
 Triggered when payment is received but cannot be linked to a session (e.g., customer paid to a reused address).
 
 **Payload:**
 ```json
 {
-  "event": "unknow.paid",
+  "event": "unknown.paid",
   "params": ["neo", 1000]
 }
 ```
@@ -314,14 +314,14 @@ Triggered when payment is received but cannot be linked to a session (e.g., cust
 
 ---
 
-#### unknow.settled
+#### unknown.settled
 
 Triggered when unlinked funds are transferred to your merchant account.
 
 **Payload:**
 ```json
 {
-  "event": "unknow.settled",
+  "event": "unknown.settled",
   "params": ["neo", 9500]
 }
 ```

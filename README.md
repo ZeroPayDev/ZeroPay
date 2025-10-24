@@ -63,25 +63,6 @@ The easiest way to run ZeroPay with all dependencies:
    docker-compose logs -f zeropay
    ```
 
-### Using Docker Standalone
-
-```bash
-# Pull the latest image
-docker pull zeropaydev/zeropay:latest
-
-# Run with environment variables
-docker run -d \
-  --name zeropay \
-  -p 9000:9000 \
-  -e DATABASE_URL=postgres://user:pass@host:5432/zeropay \
-  -e REDIS_URL=redis://host:6379 \
-  -e MNEMONICS="your mnemonic phrase" \
-  -e WALLET=0xYourWallet \
-  -e APIKEY=your-api-key \
-  -v $(pwd)/config.toml:/app/config.toml \
-  zeropaydev/zeropay:latest
-```
-
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
 
 ## Documentation
@@ -141,101 +122,6 @@ For a hassle-free experience, use our managed platform at [zpaynow.com](https://
 └─────────────────────────────────────┘
 ```
 
-## Features
-
-### Payment Processing
-- Create unique payment addresses for each transaction
-- Support for multiple stablecoins (USDT, USDC, DAI, etc.)
-- Automatic payment detection and confirmation
-- Configurable confirmation blocks for security
-- Support for both traditional and x402 A2A payment flows
-
-### x402 Agent-to-Agent (A2A) Protocol
-ZeroPay implements the x402 protocol, enabling AI agents and autonomous systems to interact with payment APIs programmatically:
-
-- **Payment Requirements Discovery**: AI agents can query payment requirements and supported methods
-- **EIP-3009 Authorization**: Gasless payment authorization using EIP-712 signatures
-- **Automatic Verification**: Signature validation, balance checks, and transaction simulation
-- **Instant Settlement**: Execute payments via `transferWithAuthorization` for immediate settlement
-- **Resource Discovery**: Browse and discover available payment-enabled services
-
-**x402 API Endpoints:**
-- `GET /x402/requirements` - Get payment requirements for a resource
-- `POST /x402/payments` - Submit payment authorization and settle
-- `GET /x402/support` - List supported payment schemes and networks
-- `GET /x402/discovery` - Discover available payment-enabled resources
-
-See the [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md) for complete x402 implementation details.
-
-### Blockchain Support
-- **EVM-Compatible Chains**: Ethereum, Polygon, BSC, Arbitrum, Optimism, Avalanche, etc.
-- **Extensible**: Easy to add new chains via configuration
-- **Multi-Token**: Support any ERC-20 token with EIP-3009 support
-
-### Webhook Events
-- `session.paid` - Customer completed payment
-- `session.settled` - Funds transferred to merchant
-- `unknow.paid` - Unlinked payment received
-- `unknow.settled` - Unlinked payment settled
-
-### Security
-- HMAC-SHA256 webhook signatures
-- EIP-712 signature verification for x402 payments
-- API key authentication
-- HD wallet derivation for payment addresses
-- Configurable confirmation requirements
-
-## Configuration
-
-### Environment Variables
-
-**For Docker Compose:** Edit the `environment` section in `docker-compose.yml`
-
-**For local development:** Create a `.env` file or set as environment variables
-
-Key configuration options:
-
-```bash
-PORT=9000                                            # API server port
-DATABASE_URL=postgres://user:pass@host:5432/zeropay # PostgreSQL connection
-REDIS_URL=redis://host:6379                          # Redis connection
-MNEMONICS=your twelve or twenty-four word phrase     # BIP39 seed phrase
-WALLET=0xa0..00                                      # Settlement wallet address
-APIKEY=your-secure-api-key                           # API authentication key
-WEBHOOK=https://your-app.com/webhook                 # Webhook endpoint URL
-SCANNER_CONFIG=config.toml                           # Chain config file path
-```
-
-### Chain Configuration
-
-Configure supported blockchains in `config.toml`:
-
-```toml
-[[chains]]
-chain_type = "evm"
-chain_name = "ethereum"
-latency = 6                    # Confirmation blocks
-estimation = 72                # Seconds to confirm
-commission = 5                 # 5% commission
-commission_min = 50            # $0.50 minimum
-commission_max = 200           # $2.00 maximum
-admin = "0xYourPrivateKey"     # Gas payment account
-rpc = "https://eth-mainnet.g.alchemy.com/v2/YOUR-KEY"
-tokens = [
-  "USDT:0xdAC17F958D2ee523a2206206994597C13D831ec7",
-  "USDC:0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-]
-```
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete configuration details.
-
-## API Usage
-
-For API usage examples and integration guides:
-- **Traditional Payment Flow**: See [API.md](./API.md) for complete REST API documentation
-- **x402 A2A Payment Flow**: See [x402.md](./x402.md) for x402 protocol integration guide
-- **AI Agent Integration**: See [AI_INTEGRATION_GUIDE.md](./docs/AI_INTEGRATION_GUIDE.md) for AI agent prompt and integration guide
-
 ## Development
 
 ### Prerequisites
@@ -289,19 +175,3 @@ If you discover a security vulnerability, please email hi@zpaynow.com instead of
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md) | [x402.md](./x402.md) | [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)
-- **x402 Protocol**: [API Documentation](./docs/API_DOCUMENTATION.md) | [Specification](https://github.com/zeropaydev/x402)
-- **Issues**: [GitHub Issues](https://github.com/ZeroPayDev/zeropay/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/ZeroPayDev/zeropay/discussions)
-- **Platform Support**: hi@zpaynow.com
-
-<div align="center">
-
-Made with ❤️ by the ZeroPay community
-
-[Website](https://zpaynow.com) • [GitHub](https://github.com/ZeroPayDev/zeropay) • [Twitter](https://twitter.com/zeropaydev)
-
-</div>
