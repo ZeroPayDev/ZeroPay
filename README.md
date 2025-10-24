@@ -87,8 +87,9 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
 ## Documentation
 
 - **[Deployment Guide](./DEPLOYMENT.md)** - Complete setup instructions for Docker and source builds
-- **[API Reference](./API.md)** - REST API endpoints and webhook events
-- **[AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)** - x402 A2A protocol implementation guide for AI agents
+- **[API Reference](./API.md)** - REST API endpoints, webhook events, and usage examples
+- **[x402 Protocol Integration](./x402.md)** - Agent-to-Agent (A2A) payment protocol integration guide
+- **[AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)** - Prompt and guide for AI agents to integrate with ZeroPay API
 - **[Configuration Guide](#configuration)** - Environment and chain configuration
 
 ## Managed Platform
@@ -230,112 +231,10 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete configuration details.
 
 ## API Usage
 
-### Traditional Payment Flow
-
-Create a payment session and receive a unique deposit address:
-
-```bash
-curl -X POST "http://localhost:9000/sessions?apikey=your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "customer": "user123",
-    "amount": 1000
-  }'
-```
-
-Check payment status:
-
-```bash
-curl "http://localhost:9000/sessions/12345?apikey=your-api-key"
-```
-
-### x402 A2A Payment Flow
-
-Query payment requirements for AI agents:
-
-```bash
-curl -X POST "http://localhost:9000/x402/requirements?apikey=your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "customer": "agent_alice",
-    "amount": 1000
-  }'
-```
-
-Submit payment authorization and settle:
-
-```bash
-curl -X POST "http://localhost:9000/x402/payments?apikey=your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "payment_payload": {
-      "x402_version": 1,
-      "scheme": "exact",
-      "network": "base-sepolia",
-      "payload": {
-        "signature": "0x...",
-        "authorization": {
-          "from": "0x...",
-          "to": "0x...",
-          "value": "1000000",
-          "validAfter": "0",
-          "validBefore": "1735689600",
-          "nonce": "0x..."
-        }
-      }
-    },
-    "payment_requirements": {...}
-  }'
-```
-
-See [API.md](./API.md) for complete traditional API documentation and [AI_INTEGRATION_GUIDE.md](./docs/AI_INTEGRATION_GUIDE.md) for x402 protocol details.
-
-## x402 Protocol Integration
-
-The x402 protocol enables autonomous AI agents to interact with ZeroPay for programmatic payments. Key capabilities:
-
-### How It Works
-
-1. **Discovery**: AI agents query `/x402/requirements` to get payment requirements
-2. **Authorization**: Agent creates an EIP-712 signature authorizing the payment
-3. **Settlement**: ZeroPay verifies the signature and settles via `transferWithAuthorization`
-4. **Response**: Agent receives transaction hash and settlement confirmation
-
-### Key Benefits
-
-- **Gasless Payments**: Payee covers gas fees, not the payer
-- **Instant Settlement**: No waiting for blockchain confirmations
-- **Secure**: EIP-712 signatures with time-bound authorization
-- **Discoverable**: Agents can browse available services via `/x402/discovery`
-
-### Supported Payment Schemes
-
-- **exact**: EIP-3009 exact transfer authorization
-- **Networks**: Base, Ethereum, Polygon, and other EVM chains
-- **Tokens**: USDC and other EIP-3009 compatible tokens
-
-### Client SDKs
-
-For AI agent developers, use the ZeroPay x402 client SDK:
-
-```rust
-use x402::client::{ClientFacilitator, PaymentMethod};
-
-// Initialize client with wallet
-let facilitator = ClientFacilitator::new();
-facilitator.add_payment_method(
-    "base-sepolia",
-    PaymentMethod::Evm(signer, rpc_url, tokens)
-);
-
-// Create payment payload
-let payload = facilitator.create_payment(&requirements).await?;
-
-// Submit payment
-let response = facilitator.pay(&url, payload).await?;
-```
-
-See the complete [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md) for implementation details.
+For API usage examples and integration guides:
+- **Traditional Payment Flow**: See [API.md](./API.md) for complete REST API documentation
+- **x402 A2A Payment Flow**: See [x402.md](./x402.md) for x402 protocol integration guide
+- **AI Agent Integration**: See [AI_INTEGRATION_GUIDE.md](./docs/AI_INTEGRATION_GUIDE.md) for AI agent prompt and integration guide
 
 ## Development
 
@@ -393,7 +292,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Support
 
-- **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md) | [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)
+- **Documentation**: [DEPLOYMENT.md](./DEPLOYMENT.md) | [API.md](./API.md) | [x402.md](./x402.md) | [AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)
 - **x402 Protocol**: [API Documentation](./docs/API_DOCUMENTATION.md) | [Specification](https://github.com/zeropaydev/x402)
 - **Issues**: [GitHub Issues](https://github.com/ZeroPayDev/zeropay/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/ZeroPayDev/zeropay/discussions)

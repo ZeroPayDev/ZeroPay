@@ -342,7 +342,26 @@ Triggered when unlinked funds are transferred to your merchant account.
 | `404` | Not Found - Session does not exist |
 | `500` | Internal Server Error |
 
-## Examples
+## API Usage
+
+### Traditional Payment Flow
+
+Create a payment session and receive a unique deposit address:
+
+```bash
+curl -X POST "http://localhost:9000/sessions?apikey=your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": "user123",
+    "amount": 1000
+  }'
+```
+
+Check payment status:
+
+```bash
+curl "http://localhost:9000/sessions/12345?apikey=your-api-key"
+```
 
 ### Complete Payment Flow
 
