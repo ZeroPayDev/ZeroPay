@@ -296,14 +296,14 @@ Triggered when funds (minus commission) are transferred to your merchant account
 
 ---
 
-#### unknow.paid
+#### unknown.paid
 
 Triggered when payment is received but cannot be linked to a session (e.g., customer paid to a reused address).
 
 **Payload:**
 ```json
 {
-  "event": "unknow.paid",
+  "event": "unknown.paid",
   "params": ["neo", 1000]
 }
 ```
@@ -314,14 +314,14 @@ Triggered when payment is received but cannot be linked to a session (e.g., cust
 
 ---
 
-#### unknow.settled
+#### unknown.settled
 
 Triggered when unlinked funds are transferred to your merchant account.
 
 **Payload:**
 ```json
 {
-  "event": "unknow.settled",
+  "event": "unknown.settled",
   "params": ["neo", 9500]
 }
 ```
@@ -342,7 +342,26 @@ Triggered when unlinked funds are transferred to your merchant account.
 | `404` | Not Found - Session does not exist |
 | `500` | Internal Server Error |
 
-## Examples
+## API Usage
+
+### Traditional Payment Flow
+
+Create a payment session and receive a unique deposit address:
+
+```bash
+curl -X POST "http://localhost:9000/sessions?apikey=your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": "user123",
+    "amount": 1000
+  }'
+```
+
+Check payment status:
+
+```bash
+curl "http://localhost:9000/sessions/12345?apikey=your-api-key"
+```
 
 ### Complete Payment Flow
 
