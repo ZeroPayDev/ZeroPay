@@ -93,7 +93,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
 
 ## Managed Platform
 
-For a hassle-free experience, use our managed platform at [zeropay.dev](https://zeropay.dev):
+For a hassle-free experience, use our managed platform at [zpaynow.com](https://zpaynow.com):
 
 **Benefits:**
 - No infrastructure management required
@@ -103,8 +103,8 @@ For a hassle-free experience, use our managed platform at [zeropay.dev](https://
 - Enterprise-grade reliability
 
 **Setup:**
-1. Register your merchant account at [zeropay.dev](https://zeropay.dev)
-2. Use `https://api.zeropay.dev` as your API endpoint
+1. Register your merchant account at [zpaynow.com](https://zpaynow.com)
+2. Use `https://api.zpaynow.com` as your API endpoint
 3. Start accepting payments immediately
 
 **Note:** The platform charges a small commission for gas fees and hosting.
@@ -376,7 +376,7 @@ We welcome contributions!
 
 ### Reporting Vulnerabilities
 
-If you discover a security vulnerability, please email hi@zeropay.dev instead of using the issue tracker.
+If you discover a security vulnerability, please email hi@zpaynow.com instead of using the issue tracker.
 
 ### Best Practices
 
@@ -397,12 +397,12 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 - **x402 Protocol**: [API Documentation](./docs/API_DOCUMENTATION.md) | [Specification](https://github.com/zeropaydev/x402)
 - **Issues**: [GitHub Issues](https://github.com/ZeroPayDev/zeropay/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/ZeroPayDev/zeropay/discussions)
-- **Platform Support**: hi@zeropay.dev
+- **Platform Support**: hi@zpaynow.com
 
 <div align="center">
 
 Made with ❤️ by the ZeroPay community
 
-[Website](https://zeropay.dev) • [GitHub](https://github.com/ZeroPayDev/zeropay) • [Twitter](https://twitter.com/zeropaydev)
+[Website](https://zpaynow.com) • [GitHub](https://github.com/ZeroPayDev/zeropay) • [Twitter](https://twitter.com/zeropaydev)
 
 </div>

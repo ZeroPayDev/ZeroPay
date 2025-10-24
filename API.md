@@ -34,7 +34,7 @@ http://your-domain:9000
 
 ### Platform (Managed Service)
 ```
-https://api.zeropay.dev
+https://api.zpaynow.com
 ```
 
 Platform deployment includes additional features such as a public payment UI and automatic chain configuration, with a commission deducted as gas fee handling.
@@ -73,7 +73,7 @@ Create a new payment session for a customer.
   "amount": 1000,
   "expired": "2025-10-13T12:00:00Z",
   "completed": false,
-  "session_url": "https://zeropay.dev/pay/abc123",
+  "session_url": "https://zpaynow.com/pay/abc123",
   "merchant": "Your Store Name",
   "chains": [
     {
@@ -133,7 +133,7 @@ Create a new payment session for a customer.
 
 **Example Request:**
 ```bash
-curl -X POST "https://api.zeropay.dev/sessions?apikey=your-api-key" \
+curl -X POST "https://api.zpaynow.com/sessions?apikey=your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": "neo",
@@ -161,7 +161,7 @@ Returns the same response structure as the Create Payment Session endpoint.
 
 **Example Request:**
 ```bash
-curl "https://api.zeropay.dev/sessions/12345?apikey=your-api-key"
+curl "https://api.zpaynow.com/sessions/12345?apikey=your-api-key"
 ```
 
 ---
@@ -348,7 +348,7 @@ Triggered when unlinked funds are transferred to your merchant account.
 
 1. **Create a payment session:**
 ```bash
-curl -X POST "https://api.zeropay.dev/sessions?apikey=your-api-key" \
+curl -X POST "https://api.zpaynow.com/sessions?apikey=your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": "user123",
@@ -364,7 +364,7 @@ curl -X POST "https://api.zeropay.dev/sessions?apikey=your-api-key" \
 
 3. **Monitor session status (polling):**
 ```bash
-curl "https://api.zeropay.dev/sessions/12345?apikey=your-api-key"
+curl "https://api.zpaynow.com/sessions/12345?apikey=your-api-key"
 ```
 
 4. **Receive webhook notifications:**
@@ -396,4 +396,4 @@ For higher limits, contact support or consider self-hosting.
 
 For questions and issues:
 - GitHub: [https://github.com/ZeroPayDev/zeropay/issues](https://github.com/ZeroPayDev/zeropay/issues)
-- Platform Support: [https://zeropay.dev/support](https://zeropay.dev/support)
+- Platform Support: [https://zpaynow.com/support](https://zpaynow.com/support)
