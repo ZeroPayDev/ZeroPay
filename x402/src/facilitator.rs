@@ -76,6 +76,7 @@ impl Facilitator {
                 transaction: "".to_owned(),
                 network: req.payment_payload.network.clone(),
                 payer: req.payment_payload.payload.authorization.from.clone(),
+                feedback_auth: None,
             }
         }
     }

@@ -12,6 +12,7 @@ use alloy::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use eip8004::FeedbackAuth;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -251,7 +252,10 @@ impl EvmScheme {
         Ok(())
     }
 
-    async fn handle_settle(&self, req: &VerifyRequest) -> Result<String, Error> {
+    async fn handle_settle(
+        &self,
+        req: &VerifyRequest,
+    ) -> Result<(String, Option<FeedbackAuth>), Error> {
         // Get the token address and parse authorization
         let token: Address = req
             .payment_requirements
@@ -322,8 +326,24 @@ impl EvmScheme {
             .await
             .map_err(|_| Error::InvalidTransactionState)?;
 
+        let feedback_auth = if let Some(index) = req.payment_payload.payload.feedback_index {
+            // TODO
+            Some(FeedbackAuth {
+                agent_id: 0,
+                client_address: req.payment_payload.payload.authorization.from.clone(),
+                index_limit: index,
+                expiry: 0,
+                chain_id: 0,
+                identity_registry: "".to_owned(),
+                signer_address: "".to_owned(),
+                signature: Some("".to_owned()),
+            })
+        } else {
+            None
+        };
+
         // Return the transaction hash
-        Ok(format!("{:?}", receipt.transaction_hash))
+        Ok((format!("{:?}", receipt.transaction_hash), feedback_auth))
     }
 }
 
@@ -410,12 +430,13 @@ impl PaymentScheme for EvmScheme {
     /// parameters provided in the payment payload.
     async fn settle(&self, req: &VerifyRequest) -> SettlementResponse {
         match self.handle_settle(req).await {
-            Ok(tx_hash) => SettlementResponse {
+            Ok((tx_hash, feedback_auth)) => SettlementResponse {
                 success: true,
                 error_reason: None,
                 transaction: tx_hash,
                 network: req.payment_payload.network.clone(),
                 payer: req.payment_payload.payload.authorization.from.clone(),
+                feedback_auth,
             },
             Err(error) => error.settle(&req.payment_payload),
         }
