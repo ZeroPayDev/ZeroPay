@@ -26,7 +26,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::level_filters::LevelFilter;
-use x402::{EvmScheme, Facilitator};
+use x402::{Evm8004Registry, EvmScheme, Facilitator};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -62,6 +62,14 @@ struct Command {
     /// Scanner chains configure file path
     #[arg(long, env = "SCANNER_CONFIG", default_value = "config.toml")]
     scanner_config: String,
+
+    /// EIP-8004 registry agent id
+    #[arg(long, env = "AGENT_ID")]
+    agent_id: Option<i64>,
+
+    /// EIP-8004 registry agent identity contract
+    #[arg(long, env = "AGENT_IDENTITY")]
+    agent_identity: Option<String>,
 }
 
 #[derive(Clone)]
@@ -136,11 +144,17 @@ async fn main() {
             .unwrap();
 
     // building x402 facilitator
+    let agent = match (args.agent_id, args.agent_identity) {
+        (Some(agent_id), Some(identity)) => Some(Evm8004Registry { agent_id, identity }),
+        _ => None,
+    };
     let mut facilitator = Facilitator::new();
     for c in x402_assets {
         match c.ctype {
             ChainType::Evm => {
-                let mut scheme = EvmScheme::new(&c.rpc, &c.network, &c.signer).unwrap();
+                let mut scheme = EvmScheme::new(&c.rpc, &c.network, &c.signer, agent.clone())
+                    .await
+                    .unwrap();
                 for asset in c.assets {
                     scheme
                         .asset(&asset.address, &asset.name, &asset.version)

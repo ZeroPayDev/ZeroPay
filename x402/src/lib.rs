@@ -1,5 +1,5 @@
 mod scheme;
-pub use scheme::evm::EvmScheme;
+pub use scheme::evm::{Evm8004Registry, EvmAsset, EvmScheme};
 pub use scheme::sol::SolScheme;
 
 pub mod client;
@@ -7,6 +7,7 @@ pub mod facilitator;
 pub use facilitator::Facilitator;
 
 use async_trait::async_trait;
+use eip8004::FeedbackAuth;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -75,6 +76,10 @@ pub struct SchemePayload {
     pub signature: String,
     /// EIP-3009 authorization parameters
     pub authorization: Authorization,
+    /// The index in client feedback for 8004 Reputation,
+    /// If has this field, and service has register agent info,
+    /// The `SettlementResponse` will has `feedback_auth` field.
+    pub feedback_index: Option<u64>,
 }
 
 /// EIP-3009 authorization parameters
@@ -126,6 +131,7 @@ impl VerifyResponse {
             transaction: tx.to_owned(),
             network: network.to_owned(),
             payer: self.payer,
+            feedback_auth: None,
         }
     }
 }
@@ -144,6 +150,8 @@ pub struct SettlementResponse {
     pub network: String,
     /// Address of the payer's wallet
     pub payer: String,
+    /// The feedback authorized signature for 8004 Reputation
+    pub feedback_auth: Option<FeedbackAuth>,
 }
 
 /// List supported payment schemes.
@@ -338,6 +346,7 @@ impl Error {
             transaction: "".to_owned(),
             network: req.network.clone(),
             payer: req.payload.authorization.from.clone(),
+            feedback_auth: None,
         }
     }
 }

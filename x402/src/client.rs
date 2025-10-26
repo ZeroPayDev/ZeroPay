@@ -97,11 +97,12 @@ impl ClientFacilitator {
     pub fn build<'a>(
         &self,
         prs: &'a [PaymentRequirements],
+        feedback_index: Option<u64>,
     ) -> Result<(PaymentPayload, &'a PaymentRequirements)> {
         for pr in prs.iter() {
             let identity = format!("{}-{}", pr.scheme, pr.network);
             if self.infos.contains_key(&identity) {
-                let payload = self.build_with_scheme(pr)?;
+                let payload = self.build_with_scheme(pr, feedback_index)?;
                 return Ok((payload, pr));
             }
         }
@@ -110,7 +111,11 @@ impl ClientFacilitator {
     }
 
     /// Build the payment payload by a paymentRequirements
-    pub fn build_with_scheme(&self, pr: &PaymentRequirements) -> Result<PaymentPayload> {
+    pub fn build_with_scheme(
+        &self,
+        pr: &PaymentRequirements,
+        feedback_index: Option<u64>,
+    ) -> Result<PaymentPayload> {
         let identity = format!("{}-{}", pr.scheme, pr.network);
 
         if let Some(info) = self.infos.get(&identity) {
@@ -125,6 +130,7 @@ impl ClientFacilitator {
                 payload: SchemePayload {
                     signature,
                     authorization,
+                    feedback_index,
                 },
             })
         } else {
