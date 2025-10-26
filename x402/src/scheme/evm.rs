@@ -3,7 +3,7 @@ use crate::{
     VerifyRequest, VerifyResponse,
 };
 use alloy::{
-    primitives::{Address, B256, U256},
+    primitives::{Address, B256, Bytes, U256},
     providers::{Provider, ProviderBuilder},
     signers::{Signature, SignerSync, local::PrivateKeySigner},
     sol,
@@ -12,7 +12,7 @@ use alloy::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use eip8004::FeedbackAuth;
+use eip8004::{FeedbackAuth, FeedbackOnchainAuth};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -61,6 +61,7 @@ impl TransferWithAuthorization {
     }
 }
 
+/// EIP-3009 based assets/tokens
 pub struct EvmAsset {
     name: String,
     version: String,
@@ -69,21 +70,58 @@ pub struct EvmAsset {
     extra: Value,
 }
 
+/// EIP-8004 agent registry infomation
+#[derive(Clone, Debug)]
+pub struct Evm8004Registry {
+    pub agent_id: i64,
+    pub identity: String,
+}
+
+struct InnerEvm8004Registry {
+    pub agent_id: U256,
+    pub identity_registry: Address,
+}
+
+/// Evm-based scheme
 pub struct EvmScheme {
+    chain_id: u64,
     scheme: String,
     network: String,
     rpc: Url,
     signer: PrivateKeySigner,
     assets: HashMap<Address, EvmAsset>,
+    agent: Option<InnerEvm8004Registry>,
 }
 
 impl EvmScheme {
-    pub fn new(url: &str, network: &str, signer: &str) -> Result<Self> {
-        let rpc = url.parse()?;
+    /// Build the evm scheme with EIP-8004 agent
+    pub async fn new(
+        url: &str,
+        network: &str,
+        signer: &str,
+        agent: Option<Evm8004Registry>,
+    ) -> Result<Self> {
+        let rpc: Url = url.parse()?;
         let signer = signer.parse()?;
+
+        let provider = ProviderBuilder::new().connect_http(rpc.clone());
+        let chain_id = provider.get_chain_id().await?;
+
+        let agent = if let Some(agent) = agent {
+            let identity_registry: Address = agent.identity.parse()?;
+            Some(InnerEvm8004Registry {
+                agent_id: U256::from(agent.agent_id),
+                identity_registry,
+            })
+        } else {
+            None
+        };
+
         Ok(Self {
+            chain_id,
             rpc,
             signer,
+            agent,
             scheme: SCHEME.to_owned(),
             network: network.to_owned(),
             assets: HashMap::new(),
@@ -106,9 +144,6 @@ impl EvmScheme {
         // Create provider and contract instance
         let provider = ProviderBuilder::new().connect_http(self.rpc.clone());
 
-        // Get chain ID for EIP-712 domain
-        let chain_id = provider.get_chain_id().await?;
-
         // Verify the contract has the required EIP-3009 functions by calling view functions
         let contract = Eip3009Token::new(token_address, &provider);
         let decimal = contract.decimals().call().await?;
@@ -124,7 +159,7 @@ impl EvmScheme {
         let domain = create_eip712_domain(
             name.to_string(),
             version.to_string(),
-            chain_id,
+            self.chain_id,
             token_address,
         );
 
@@ -326,20 +361,29 @@ impl EvmScheme {
             .await
             .map_err(|_| Error::InvalidTransactionState)?;
 
-        let feedback_auth = if let Some(index) = req.payment_payload.payload.feedback_index {
-            // TODO
-            Some(FeedbackAuth {
-                agent_id: 0,
-                client_address: req.payment_payload.payload.authorization.from.clone(),
-                index_limit: index,
-                expiry: 0,
-                chain_id: 0,
-                identity_registry: "".to_owned(),
-                signer_address: "".to_owned(),
-                signature: Some("".to_owned()),
-            })
-        } else {
-            None
+        let feedback_auth = match (&self.agent, req.payment_payload.payload.feedback_index) {
+            (Some(agent), Some(index)) => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|_| Error::UnexpectedVerifyError)?
+                    .as_secs();
+                let expiry = now + 86400; // default is 1 Day
+
+                let mut feedback = FeedbackOnchainAuth {
+                    agentId: agent.agent_id,
+                    identityRegistry: agent.identity_registry,
+                    clientAddress: from,
+                    indexLimit: index,
+                    expiry: U256::from(expiry),
+                    chainId: U256::from(self.chain_id),
+                    signerAddress: self.signer.address(),
+                    signature: Bytes::default(),
+                };
+                let _ = feedback.sign(&self.signer).await;
+
+                Some(feedback.to_feedback_auth())
+            }
+            _ => None,
         };
 
         // Return the transaction hash

@@ -1,5 +1,5 @@
 mod scheme;
-pub use scheme::evm::EvmScheme;
+pub use scheme::evm::{Evm8004Registry, EvmAsset, EvmScheme};
 pub use scheme::sol::SolScheme;
 
 pub mod client;
