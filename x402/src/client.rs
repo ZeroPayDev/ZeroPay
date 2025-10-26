@@ -130,7 +130,7 @@ impl ClientFacilitator {
                 payload: SchemePayload {
                     signature,
                     authorization,
-                    feedback_index: feedback_index,
+                    feedback_index,
                 },
             })
         } else {
