@@ -34,7 +34,7 @@ impl Session {
     pub async fn list_unused(customer: i32, db: &PgPool) -> Result<Vec<Session>> {
         let res = query_as!(
             Self,
-            "SELECT * FROM sessions WHERE customer=$1 AND deposit IS NULL",
+            "SELECT * FROM sessions WHERE customer=$1 AND deposit IS NULL ORDER BY id DESC",
             customer,
         )
         .fetch_all(db)

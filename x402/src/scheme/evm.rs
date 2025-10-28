@@ -35,8 +35,8 @@ sol! {
         address from;
         address to;
         uint256 value;
-        uint256 valid_after;
-        uint256 valid_before;
+        uint256 validAfter;
+        uint256 validBefore;
         bytes32 nonce;
     }
 }
@@ -54,8 +54,8 @@ impl TransferWithAuthorization {
             from,
             to,
             value,
-            valid_after,
-            valid_before,
+            validAfter: valid_after,
+            validBefore: valid_before,
             nonce,
         })
     }
@@ -132,13 +132,15 @@ impl EvmScheme {
     ///
     /// # Arguments
     /// * `addr` - The token contract address
-    /// * `name` - The token name for EIP-712 domain (e.g., "USD Coin")
-    /// * `version` - The token version for EIP-712 domain (e.g., "2")
     ///
     /// # Returns
     /// * `Ok(())` if the token is valid and supports EIP-3009
     /// * `Err` if the token is invalid or doesn't support EIP-3009
-    pub async fn asset(&mut self, addr: &str, name: &str, version: &str) -> Result<()> {
+    ///
+    /// # Note
+    /// This function automatically reads the token name and version from the contract
+    /// to ensure they match the contract's DOMAIN_SEPARATOR for EIP-712 signing
+    pub async fn asset(&mut self, addr: &str) -> Result<()> {
         let token_address: Address = addr.parse()?;
 
         // Create provider and contract instance
@@ -155,18 +157,34 @@ impl EvmScheme {
             .call()
             .await?;
 
-        // Create EIP-712 domain
+        // Read the contract's actual name, version, and DOMAIN_SEPARATOR
+        let name = contract.name().call().await?;
+        let version = contract.version().call().await?;
+        let contract_domain_separator = contract.DOMAIN_SEPARATOR().call().await?;
+
+        // Create EIP-712 domain with contract's actual name/version
         let domain = create_eip712_domain(
-            name.to_string(),
-            version.to_string(),
+            name.clone(),
+            version.clone(),
             self.chain_id,
             token_address,
         );
+        let computed_domain_separator = domain.hash_struct();
 
-        // Create and store the asset
+        // Verify the computed domain matches the contract's DOMAIN_SEPARATOR
+        if computed_domain_separator != contract_domain_separator {
+            return Err(anyhow::anyhow!(
+                "Domain separator mismatch! Contract DOMAIN_SEPARATOR doesn't match computed value. \
+                 Contract name: '{}', version: '{}', chain ID: {}",
+                name, version, self.chain_id
+            ));
+        }
+
+        // Create and store the asset with contract's actual parameters
         let extra = json!({
             "name": name,
-            "version": version
+            "version": version,
+            "chainId": self.chain_id,
         });
         let asset = EvmAsset {
             name: name.to_owned(),
