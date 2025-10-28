@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM sessions WHERE customer=$1 AND deposit IS NULL",
+  "query": "SELECT * FROM sessions WHERE customer=$1 AND deposit IS NULL ORDER BY id DESC",
   "describe": {
     "columns": [
       {
@@ -54,5 +54,5 @@
       false
     ]
   },
-  "hash": "ba909ec779e2dbce5a6e3dffe091b8deb0d2687b8d9e8fcba4057af7b002e266"
+  "hash": "c778142486f208998e9103df15271bdd2e1e7c5076038b015cdd194b8e435394"
 }
