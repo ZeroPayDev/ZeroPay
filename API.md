@@ -73,7 +73,7 @@ Create a new payment session for a customer.
   "amount": 1000,
   "expired": "2025-10-13T12:00:00Z",
   "completed": false,
-  "session_url": "https://zpaynow.com/pay/abc123",
+  "session_url": "https://zpaynow.com/sessions/abc123",
   "merchant": "Your Store Name",
   "chains": [
     {
@@ -414,5 +414,5 @@ For higher limits, contact support or consider self-hosting.
 ## Support
 
 For questions and issues:
-- GitHub: [https://github.com/ZeroPayDev/zeropay/issues](https://github.com/ZeroPayDev/zeropay/issues)
+- GitHub: [https://github.com/zpaynow/zeropay/issues](https://github.com/zpaynow/zeropay/issues)
 - Platform Support: [https://zpaynow.com/support](https://zpaynow.com/support)

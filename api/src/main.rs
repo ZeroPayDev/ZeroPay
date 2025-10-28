@@ -156,10 +156,8 @@ async fn main() {
                     .await
                     .unwrap();
                 for asset in c.assets {
-                    scheme
-                        .asset(&asset.address, &asset.name, &asset.version)
-                        .await
-                        .unwrap();
+                    // try x402 asset
+                    scheme.asset(&asset.address).await.unwrap();
                 }
                 facilitator.register(scheme);
             }

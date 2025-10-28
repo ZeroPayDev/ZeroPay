@@ -155,7 +155,7 @@ impl<S: ScannerStorage> ScannerService<S> {
                 let mut values = t.split(":");
                 let name: String = values.next().unwrap_or_default().to_owned();
                 let token: Address = values.next().unwrap_or_default().parse()?;
-                let version = values.next().unwrap_or_default().to_owned();
+                let version = values.next().unwrap_or_default().to_owned(); // EIP-3009 x402
                 let decimal = evm::get_token_decimal(token, provider.clone()).await?;
                 let identity = format!("{}:{}", config.chain_name, name);
 

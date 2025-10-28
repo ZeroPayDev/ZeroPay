@@ -16,7 +16,7 @@ ZeroPay is a cryptocurrency payment gateway that:
 
 ```javascript
 const ZEROPAY_CONFIG = {
-  apiUrl: "https://api.zeropay.example.com",  // Replace with actual API URL
+  apiUrl: "https://api.zpaynow.com",           // Replace with actual API URL
   apiKey: "your-api-key-here",                 // Provided by ZeroPay
   webhookSecret: "your-api-key-here",          // Same as apiKey for HMAC verification
 };

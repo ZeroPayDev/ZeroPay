@@ -36,7 +36,7 @@ ZeroPay is a payment gateway that allows you to accept cryptocurrency payments (
 ### Base URL
 
 ```
-https://api.zeropay.example.com
+https://api.zpaynow.com
 ```
 
 Replace with your actual ZeroPay API URL provided during onboarding.
@@ -78,7 +78,7 @@ Create a new payment session for a customer.
 **Example Request:**
 
 ```bash
-curl -X POST "https://api.zeropay.example.com/sessions?apikey=your_api_key" \
+curl -X POST "https://api.zpaynow.com/sessions?apikey=your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": "user_12345",
@@ -147,7 +147,7 @@ Retrieve details of an existing payment session.
 **Example Request:**
 
 ```bash
-curl "https://api.zeropay.example.com/sessions/42?apikey=your_api_key"
+curl "https://api.zpaynow.com/sessions/42?apikey=your_api_key"
 ```
 
 **Success Response (200 OK):**
@@ -823,18 +823,6 @@ A: Verify:
 - Endpoint returns 200 OK
 - No firewall blocking requests
 - Check ZeroPay dashboard for webhook delivery logs
-
----
-
-## Support
-
-Need help? Contact us:
-
-- Email: support@zeropay.example.com
-- Documentation: https://docs.zeropay.example.com
-- Status Page: https://status.zeropay.example.com
-
-Include your API key (first 8 characters only) and session IDs when reporting issues.
 
 ---
 
