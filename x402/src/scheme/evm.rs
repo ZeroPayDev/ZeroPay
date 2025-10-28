@@ -163,12 +163,8 @@ impl EvmScheme {
         let contract_domain_separator = contract.DOMAIN_SEPARATOR().call().await?;
 
         // Create EIP-712 domain with contract's actual name/version
-        let domain = create_eip712_domain(
-            name.clone(),
-            version.clone(),
-            self.chain_id,
-            token_address,
-        );
+        let domain =
+            create_eip712_domain(name.clone(), version.clone(), self.chain_id, token_address);
         let computed_domain_separator = domain.hash_struct();
 
         // Verify the computed domain matches the contract's DOMAIN_SEPARATOR
@@ -176,7 +172,9 @@ impl EvmScheme {
             return Err(anyhow::anyhow!(
                 "Domain separator mismatch! Contract DOMAIN_SEPARATOR doesn't match computed value. \
                  Contract name: '{}', version: '{}', chain ID: {}",
-                name, version, self.chain_id
+                name,
+                version,
+                self.chain_id
             ));
         }
 
