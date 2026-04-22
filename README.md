@@ -175,3 +175,5 @@ If you discover a security vulnerability, please email hi@zpaynow.com instead of
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+> **Usage Notice:** This software is intended for **merchant self-hosting only** — to run your own payment gateway for your own store or service. It may **not** be used to build or operate a payment business, payment platform, or SaaS product that serves other merchants. If you need a managed solution, use [zpaynow.com](https://zpaynow.com).
