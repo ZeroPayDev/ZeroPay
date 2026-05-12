@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/zeropaydev/zeropay)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org)
 
-An open-source, self-hosted payment gateway for stablecoins and cryptocurrency payments.
+An open-source, self-hosted x402 payment facilitator for AI agents and autonomous systems.
 
 [Features](#features) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Platform](#managed-platform) • [Contributing](#contributing)
 
@@ -16,144 +16,143 @@ An open-source, self-hosted payment gateway for stablecoins and cryptocurrency p
 
 ## Overview
 
-ZeroPay is a lightweight, self-hosted payment gateway that enables merchants to accept stablecoin and cryptocurrency payments with minimal setup. Built with Rust for performance and reliability, it supports multiple EVM-compatible blockchains and provides real-time webhook notifications for payment events.
-
-**New in v1.x:** ZeroPay now supports the **x402 Agent-to-Agent (A2A) payment protocol**, enabling AI agents and autonomous systems to programmatically discover, authorize, and settle payments using EIP-3009 gasless transfers.
+ZeroPay is a lightweight, self-hosted x402 payment facilitator built with Rust. It enables AI agents and autonomous systems to programmatically discover, authorize, and settle stablecoin payments using EIP-3009 gasless transfers — with no manual wallet management or blockchain infrastructure required.
 
 ### Key Features
 
+- **x402 Protocol**: Full Agent-to-Agent (A2A) payment protocol for autonomous AI integrations
+- **Gasless Payments**: EIP-3009 `transferWithAuthorization` — payer signs off-chain, payee covers gas
+- **Instant Settlement**: No waiting for blockchain confirmation; payment settles in one transaction
+- **Secure**: EIP-712 typed signatures with time-bound authorization windows
+- **Discoverable**: Agents can browse available services via `/x402/discovery`
+- **Multi-Chain**: Ethereum, Polygon, Base, and other EVM-compatible networks
+- **Stablecoin Focused**: USDC, USDT, and other EIP-3009 compatible tokens
+- **EIP-8004 Support**: Optional agent reputation and identity registry integration
 - **Self-Hosted**: Full control over your payment infrastructure
-- **Multi-Chain Support**: Compatible with Ethereum, Polygon, BSC, and other EVM chains
-- **Stablecoin Focused**: Built for USDT, USDC, and other stablecoins
-- **Real-Time Notifications**: Webhook integration for payment events
-- **Automatic Settlement**: Funds automatically transferred to your wallet (minus commission)
-- **x402 Protocol Support**: Agent-to-Agent (A2A) payment protocol for AI-powered integrations
-- **Secure**: HMAC-based webhook authentication and EIP-712 signatures
-- **Easy Integration**: RESTful API with comprehensive documentation
-- **Docker Ready**: One-command deployment with Docker
+- **Docker Ready**: One-command deployment
 
 ## Quick Start
 
 ### Using Docker Compose (Recommended)
 
-The easiest way to run ZeroPay with all dependencies:
-
-1. **Configure your settings:**
-
-   Edit `docker-compose.yml` environment variables:
+1. **Configure your settings** in `docker-compose.yml`:
    ```yaml
    environment:
      - MNEMONICS=your twelve or twenty four word mnemonic phrase
      - WALLET=0xYourWalletAddress
      - APIKEY=your-secure-api-key
-     - WEBHOOK=https://your-webhook-url.com
    ```
 
-2. **Configure blockchain:**
-
-   Edit `config.toml` with your chain settings (RPC URL, tokens, etc.)
+2. **Configure blockchain** in `config.toml`:
+   ```toml
+   [[chains]]
+   chain_type = "evm"
+   chain_name = "base-sepolia"
+   latency = 1
+   estimation = 12
+   commission = 5
+   commission_min = 50
+   commission_max = 200
+   admin = "0xYourAdminPrivateKey"
+   rpc = "https://base-sepolia.g.alchemy.com/v2/YOUR-API-KEY"
+   tokens = ["USDC:0xYourUSDCAddress:2"]
+   ```
+   The `:2` suffix marks a token as x402-compatible (EIP-3009).
 
 3. **Start all services:**
    ```bash
    docker-compose up -d
    ```
 
-4. **Check logs:**
+4. **Verify x402 support:**
    ```bash
-   docker-compose logs -f zeropay
+   curl "http://localhost:9000/x402/support?apikey=your-api-key"
    ```
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
 
 ## Documentation
 
-- **[Deployment Guide](./DEPLOYMENT.md)** - Complete setup instructions for Docker and source builds
-- **[API Reference](./API.md)** - REST API endpoints, webhook events, and usage examples
-- **[x402 Protocol Integration](./x402.md)** - Agent-to-Agent (A2A) payment protocol integration guide
-- **[AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)** - Prompt and guide for AI agents to integrate with ZeroPay API
-- **[Configuration Guide](#configuration)** - Environment and chain configuration
+- **[Deployment Guide](./DEPLOYMENT.md)** - Complete setup for Docker and source builds
+- **[API Reference](./API.md)** - x402 REST API endpoints and usage examples
+- **[x402 Protocol Guide](./x402.md)** - Protocol overview and integration details
+- **[AI Integration Guide](./docs/AI_INTEGRATION_GUIDE.md)** - Complete guide for AI agents integrating with ZeroPay
 
-## Managed Platform
+## How x402 Works
 
-For a hassle-free experience, use our managed platform at [zpaynow.com](https://zpaynow.com):
+```
+┌─────────────────────────────────────────────────────┐
+│                   AI Agent                          │
+│                                                     │
+│  1. GET /x402/requirements  →  discover payee addr  │
+│  2. Sign EIP-712 authorization off-chain            │
+│  3. POST /x402/payments     →  settle on-chain      │
+│  4. Receive tx hash + confirmation                  │
+└─────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│                 ZeroPay API                         │
+│                                                     │
+│  /x402/requirements   — payment requirements        │
+│  /x402/payments       — verify + settle             │
+│  /x402/support        — supported schemes           │
+│  /x402/discovery      — browse available services   │
+└───────────────────────┬─────────────────────────────┘
+                        │ transferWithAuthorization
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│              Blockchain (EVM)                       │
+│       EIP-3009 gasless token transfer               │
+└─────────────────────────────────────────────────────┘
+```
 
-**Benefits:**
-- No infrastructure management required
-- Automatic updates and security patches
-- Public payment UI for customers
-- Multiple chain support out of the box
-- Enterprise-grade reliability
-
-**Setup:**
-1. Register your merchant account at [zpaynow.com](https://zpaynow.com)
-2. Use `https://api.zpaynow.com` as your API endpoint
-3. Start accepting payments immediately
-
-**Note:** The platform charges a small commission for gas fees and hosting.
+**Payment flow:**
+1. Agent calls `GET /x402/requirements` with `customer` + `amount` → gets a payee address and accepted payment schemes
+2. Agent creates an EIP-712 signature authorizing the transfer (off-chain, gasless for payer)
+3. Agent calls `POST /x402/payments` with the signed authorization
+4. ZeroPay verifies the signature and executes `transferWithAuthorization` on-chain
+5. Returns transaction hash to the agent
 
 ## Architecture
 
 ```
-┌─────────────┐         ┌─────────────┐
-│   Client    │         │  AI Agent   │
-│ Application │         │  (x402)     │
-└──────┬──────┘         └──────┬──────┘
-       │ REST API              │ x402 Protocol
-       │                       │ (EIP-3009)
-       ▼                       ▼
-┌──────────────────────────────────┐
-│         ZeroPay API              │
-│  /sessions     /x402/*           │◄──────┐
-└──────┬───────────────────────────┘       │
-       │                                   │
-       ├───────────────────────────────────┤
-       │                                   │
-       ▼                                   ▼
-┌──────────┐                        ┌──────────┐
-│PostgreSQL│                        │  Redis   │
-└──────────┘                        └──────────┘
-       │
-       │ Scanner + x402 Facilitator
-       ▼
-┌─────────────────────────────────────┐
-│         Blockchain                  │
-│  (Ethereum, Polygon, Base, etc)     │
-│  EIP-3009 transferWithAuthorization │
-└─────────────────────────────────────┘
+zeropay/
+├── api/              # REST API server (Axum)
+├── scanner/          # Chain scanner + x402 asset initialization
+├── x402/             # x402 protocol types, facilitator, client SDK
+├── config.toml       # Chain and token configuration
+├── Dockerfile
+└── docker-compose.yml
 ```
 
 ## Development
 
 ### Prerequisites
 
-- Rust 1.75 or higher
+- Rust 1.75+
 - PostgreSQL 12+
 - Redis 6+
 
 ### Build from Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/ZeroPayDev/zeropay.git
+git clone https://github.com/zpaynow/zeropay.git
 cd zeropay
-
-# Build
 cargo build --release
-
-# Run
 ./target/release/api
 ```
 
-### Project Structure
+## Managed Platform
 
-```
-zeropay/
-├── api/              # REST API server
-├── scanner/          # Blockchain scanner
-├── config.toml       # Chain configuration
-├── Dockerfile        # Container build file
-└── .env-template     # Environment template
-```
+For a hassle-free experience, use our managed platform at [zpaynow.com](https://zpaynow.com):
+
+- No infrastructure management required
+- Automatic updates and security patches
+- Multiple chain support out of the box
+- Enterprise-grade reliability
+
+**Setup:** Register at [zpaynow.com](https://zpaynow.com) and use `https://api.zpaynow.com` as your API endpoint.
 
 ## Contributing
 
@@ -161,16 +160,14 @@ We welcome contributions!
 
 ### Reporting Vulnerabilities
 
-If you discover a security vulnerability, please email hi@zpaynow.com instead of using the issue tracker.
+Email hi@zpaynow.com instead of using the issue tracker.
 
 ### Best Practices
 
 - Never commit `.env` files or private keys
 - Use strong, randomly generated API keys
-- Verify webhook HMAC signatures
 - Keep dependencies updated
 - Use secure RPC endpoints
-- Enable firewall rules
 
 ## License
 

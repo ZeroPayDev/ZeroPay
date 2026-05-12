@@ -132,19 +132,6 @@ impl scanner::ScannerStorage for Storage {
     }
 }
 
-// Store customer address in Redis for fast lookup during scanning
-pub async fn store_address_in_redis(redis: &RedisClient, eth: &str, id: i32) -> Result<()> {
-    let mut conn = redis.get_multiplexed_async_connection().await?;
-
-    let key = format!("zpc:{}", eth);
-
-    // Set expiration to 30 days
-    let _: () = conn.set_ex(&key, id, 30 * 24 * 3600).await?;
-
-    debug!("Stored customer address in Redis: {}", eth);
-    Ok(())
-}
-
 // Store tranaction in Redis for avoid duplicate
 async fn store_transaction_in_redis(redis: &RedisClient, tx: &str) -> Result<()> {
     let mut conn = redis.get_multiplexed_async_connection().await?;

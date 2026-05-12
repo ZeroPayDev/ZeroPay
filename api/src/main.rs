@@ -75,7 +75,6 @@ struct Command {
 #[derive(Clone)]
 struct AppState {
     db: PgPool,
-    redis: RedisClient,
     mnemonics: String,
     apikey: String,
     facilitator: Arc<Facilitator>,
@@ -167,7 +166,6 @@ async fn main() {
     let app_state = Arc::new(AppState {
         _sender,
         db,
-        redis,
         facilitator: Arc::new(facilitator),
         apikey: args.apikey,
         mnemonics: args.mnemonics,
@@ -179,8 +177,6 @@ async fn main() {
         .allow_headers(Any);
 
     let router = Router::new()
-        .route("/sessions", post(api::create_session))
-        .route("/sessions/{id}", get(api::get_session))
         .route("/x402/requirements", get(api::x402_requirements))
         .route("/x402/payments", post(api::x402_payment))
         .route("/x402/support", get(api::x402_support))
